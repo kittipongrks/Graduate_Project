@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "181302113709",
+    "project_id": "project-graduate-chatbot",
+    "storage_bucket": "project-graduate-chatbot.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:181302113709:android:7860471f7e2407606c5d24",
+        "android_client_info": {
+          "package_name": "com.example.dahcpplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWdQISGNDcwERSt0wl3jAIHLlGarbRLK8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
