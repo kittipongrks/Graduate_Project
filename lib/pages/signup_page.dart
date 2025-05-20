@@ -20,6 +20,7 @@ class _SignUpPageState extends State<SignUpPage> {
   final passwordController = TextEditingController();
   final cfPasswordController = TextEditingController();
   final birthdateController = TextEditingController();
+  DateTime? birthdate ;
   String genderController = '';
 
   final formKey = GlobalKey<FormState>();
@@ -62,10 +63,10 @@ class _SignUpPageState extends State<SignUpPage> {
     if (userCredential != null && userCredential.user != null){
       await FirebaseFirestore.instance
           .collection('Users')
-          .doc(userCredential.user!.uid)
+          .doc(userCredential.user!.email)
           .set({
             'email': userCredential.user!.email,
-            'birthdate': birthdateController.text,
+            'birthdate': birthdate != null ? Timestamp.fromDate(birthdate!) : null,
             'gender' : genderController,
           });
     }
@@ -150,38 +151,42 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 obscureText: true,
               ),
+
+
               const SizedBox(height: 15),
               // birthdate field over 15 year old
               TextFormField(
-                controller: birthdateController,
+                controller : birthdateController,
+                readOnly: true,
                 decoration: textInputDecoration.copyWith(
                   hintText: 'Birthdate',
                   prefixIcon: Icon(
                     Icons.calendar_month,
                     color: Theme.of(context).colorScheme.secondary,),
                 ),
+                                // ...existing code...
                 onTap: () async {
                   DateTime? pickedDate = await showDatePicker(
                     context: context,
                     initialDate: DateTime.now(),
                     firstDate: DateTime.now().subtract(const Duration(days: 365 * 15)),
-                    // 15 years ago
                     lastDate: DateTime.now(),
                     builder: (context, child) {
                       return Theme(
                         data: ThemeData.light(),
                         child: child!,
                       );
-                    },  
-                    
+                    },
                   );
                   if (pickedDate != null) {
                     setState(() {
+                      birthdate = pickedDate; // เก็บเป็น DateTime
                       birthdateController.text =
                           "${pickedDate.day}/${pickedDate.month}/${pickedDate.year}";
                     });
                   }
                 },
+                // ...existing code...
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please select your bithdate';

@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:dahcpplication/pages/signup_page.dart';
+import 'package:dahcpplication/pages/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   static route() => MaterialPageRoute(
@@ -31,7 +32,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> loginUserWithEmailAndPassword() async {
     if (formKey.currentState!.validate()){}
     try {
-      final userCredential =
+      UserCredential userCredential =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
