@@ -1,10 +1,11 @@
-import 'package:dahcpplication/controller/widget.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dahcpplication/pages/login_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:random_string/random_string.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dahcpplication/controller/controller.dart';
 class SignUpPage extends StatefulWidget{
   static route() => MaterialPageRoute(
       builder: (context) => const SignUpPage(),
@@ -19,6 +20,10 @@ class SignUpPage extends StatefulWidget{
 class _SignUpPageState extends State<SignUpPage> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
+  final cfPasswordController = TextEditingController();
+  final birthdateController = TextEditingController();
+  final genderController = TextEditingController();
+
   final formKey = GlobalKey<FormState>();
 
   String email = '';
@@ -33,34 +38,36 @@ class _SignUpPageState extends State<SignUpPage> {
 
   Future<void> createUserWithEmailAndPassword() async {
     if (formKey.currentState!.validate()){}
+    if(passwordController.text != cfPasswordController.text){
+      
+    }
     try {
-      final userCredential =
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
-      print(userCredential.user?.uid);
-    } on FirebaseAuthException catch (e) {
-      print(e.message);
+        final userCredential =
+            await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: emailController.text.trim(),
+          password: passwordController.text.trim(),
+        );
+        String Id = randomAlphaNumeric(10);
+        createUserDocument(userCredential);
+        print(userCredential.user?.uid);
+      } on FirebaseAuthException catch (e) {
+        print(e.message);
+      }
+  }
+  Future<void> createUserDocument(UserCredential? userCredential) async{
+    if (userCredential != null && userCredential.user != null){
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userCredential.user!.uid)
+          .set({
+            'email': emailController.text,
+            'birthdate': birthdateController.text,
+            'gender' : genderController.text,
+          });
     }
   }
-  // Future registerUserWithEmailAndPassword(
-  //   String name , String email , String password , String gender , DateTime birthdate) async{
-  // try {
-  //   User user = (await FirebaseAuth.instance.createUserWithEmailAndPassword(
-  //     email: email,
-  //     password: password,
-  //   )).user!;
 
-  //   if(user!= null){
-  //     await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
-  //       'name': name,
-  //       'email': email
-  //   }
-  // } on FirebaseAuthException catch (e) {
-      
-  //   }
-  // }
+
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +99,10 @@ class _SignUpPageState extends State<SignUpPage> {
                 controller: emailController,
                 decoration: textInputDecoration.copyWith(
                   hintText: 'Email',
-                  prefixIcon: Icon(Icons.email),
+                  prefixIcon: Icon(
+                    Icons.email,
+                    color: Theme.of(context).colorScheme.secondary,),
+                  
                 ),
                 onChanged: (val){
                   setState(() {
@@ -116,7 +126,9 @@ class _SignUpPageState extends State<SignUpPage> {
                 controller: passwordController,
                 decoration: textInputDecoration.copyWith(
                   hintText: 'password',
-                  prefixIcon: Icon(Icons.lock),
+                  prefixIcon: Icon(
+                    Icons.lock,
+                    color: Theme.of(context).colorScheme.secondary,),
                 ),
                 obscureText: true,
                 onChanged: (val){
@@ -133,6 +145,88 @@ class _SignUpPageState extends State<SignUpPage> {
                   }
               ),
 
+              const SizedBox(height: 15),
+              TextFormField(
+                controller: cfPasswordController,
+                decoration: textInputDecoration.copyWith(
+                  hintText: 'Confirm Password',
+                  prefixIcon: Icon(
+                    Icons.lock,
+                    color: Theme.of(context).colorScheme.secondary,),
+                ),
+                obscureText: true,
+                onChanged: (val){
+                  setState(() {
+                    password = val;
+                  });
+                },
+              ),
+              const SizedBox(height: 15),
+              // birthdate field over 15 year old
+              TextFormField(
+                controller: birthdateController,
+                decoration: textInputDecoration.copyWith(
+                  hintText: 'Birthdate',
+                  prefixIcon: Icon(
+                    Icons.calendar_month,
+                    color: Theme.of(context).colorScheme.secondary,),
+                ),
+                onTap: () async {
+                  DateTime? pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime.now().subtract(const Duration(days: 365 * 15)),
+                    // 15 years ago
+                    lastDate: DateTime.now(),
+                    builder: (context, child) {
+                      return Theme(
+                        data: ThemeData.light(),
+                        child: child!,
+                      );
+                    },  
+                    
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      birthdateController.text =
+                          "${pickedDate.day}/${pickedDate.month}/${pickedDate.year}";
+                    });
+                  }
+                },
+              ),
+
+
+              const SizedBox(height: 15),
+              //gender male and female selector
+              DropdownButtonFormField<String>(
+                value: genderController.text.isNotEmpty ? genderController.text : null,
+                decoration: textInputDecoration.copyWith(
+                  hintText: 'Gender',
+                  prefixIcon: Icon(
+                    Icons.person,
+                    color: Theme.of(context).colorScheme.secondary,
+                  ),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'Male', child: Text('Male')),
+                  DropdownMenuItem(value: 'Female', child: Text('Female')),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    genderController.text = value ?? '';
+                  });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select your gender';
+                  }
+                  return null;
+                },
+              ),
+                
+
+              
+
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
@@ -145,14 +239,15 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
 
+
+              const SizedBox(height: 20),
               Text.rich(TextSpan(
                 text: 'Already have an account? ',
                 style: Theme.of(context).textTheme.titleMedium,
                 children: [
                   TextSpan(
-                    text: 'Sign In',
+                    text: ' Sign In',
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
@@ -163,26 +258,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ],
               )),
-              // GestureDetector(
-              //   onTap: () {
-              //     Navigator.push(context, LoginPage.route());
-              //   },
-              //   child: RichText(
-              //     text: TextSpan(
-              //       text: 'Already have an account? ',
-              //       style: Theme.of(context).textTheme.titleMedium,
-              //       children: [
-              //         TextSpan(
-              //           text: 'Sign In',
-              //           style:
-              //               Theme.of(context).textTheme.titleMedium?.copyWith(
-              //                     fontWeight: FontWeight.bold,
-              //                   ),
-              //         ),
-              //       ],
-              //     ),
-              //   ),
-              // ),
+              
             ],
           ),
         ),

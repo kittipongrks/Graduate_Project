@@ -24,7 +24,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'DAHC application Flutter',
       debugShowCheckedModeBanner: false,
-      theme: lightThemeData(context),
+      theme: darkThemeData(context),
       darkTheme: darkThemeData(context),
       home: StreamBuilder(
         stream: FirebaseAuth.instance.authStateChanges(),

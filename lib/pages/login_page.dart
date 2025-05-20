@@ -29,6 +29,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> loginUserWithEmailAndPassword() async {
+    if (formKey.currentState!.validate()){}
     try {
       final userCredential =
           await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -67,7 +68,9 @@ class _LoginPageState extends State<LoginPage> {
                 controller: emailController,
                 decoration: textInputDecoration.copyWith(
                   hintText: 'Email',
-                  prefixIcon: Icon(Icons.email),
+                  prefixIcon: Icon(
+                    Icons.email,
+                    color: Theme.of(context).colorScheme.secondary,),
                 ),
                 onChanged: (val){
                   setState(() {
@@ -91,7 +94,9 @@ class _LoginPageState extends State<LoginPage> {
                 controller: passwordController,
                 decoration: textInputDecoration.copyWith(
                   hintText: 'password',
-                  prefixIcon: Icon(Icons.lock),
+                  prefixIcon: Icon(
+                    Icons.lock,
+                    color: Theme.of(context).colorScheme.secondary,),
                 ),
                 obscureText: true,
                 onChanged: (val){
