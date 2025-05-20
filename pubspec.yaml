@@ -41,7 +41,6 @@ dependencies:
   cloud_firestore: ^5.6.7
   rename: ^3.1.0
   random_string : ^2.1.0
-  shared_preferences: ^2.5.3
 
 dev_dependencies:
   flutter_test:

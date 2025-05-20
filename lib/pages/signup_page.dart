@@ -3,8 +3,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dahcpplication/pages/login_page.dart';
-import 'package:random_string/random_string.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dahcpplication/controller/controller.dart';
 class SignUpPage extends StatefulWidget{
   static route() => MaterialPageRoute(
@@ -22,12 +20,9 @@ class _SignUpPageState extends State<SignUpPage> {
   final passwordController = TextEditingController();
   final cfPasswordController = TextEditingController();
   final birthdateController = TextEditingController();
-  final genderController = TextEditingController();
+  String genderController = '';
 
   final formKey = GlobalKey<FormState>();
-
-  String email = '';
-  String password = '';
 
   @override
   void dispose() {
@@ -37,32 +32,41 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Future<void> createUserWithEmailAndPassword() async {
-    if (formKey.currentState!.validate()){}
+    if (formKey.currentState!.validate()){
     if(passwordController.text != cfPasswordController.text){
-      
-    }
-    try {
-        final userCredential =
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Passwords do not match')),
+        );
+        return;
+    }else{
+      try {
+        UserCredential? userCredential =
             await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: emailController.text.trim(),
           password: passwordController.text.trim(),
         );
-        String Id = randomAlphaNumeric(10);
-        createUserDocument(userCredential);
+
+        await createUserDocument(userCredential);
         print(userCredential.user?.uid);
+
       } on FirebaseAuthException catch (e) {
         print(e.message);
       }
+    }
+    
   }
+  }
+
+  // create user document and collent in firestore
   Future<void> createUserDocument(UserCredential? userCredential) async{
     if (userCredential != null && userCredential.user != null){
       await FirebaseFirestore.instance
-          .collection('users')
+          .collection('Users')
           .doc(userCredential.user!.uid)
           .set({
-            'email': emailController.text,
+            'email': userCredential.user!.email,
             'birthdate': birthdateController.text,
-            'gender' : genderController.text,
+            'gender' : genderController,
           });
     }
   }
@@ -104,11 +108,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     color: Theme.of(context).colorScheme.secondary,),
                   
                 ),
-                onChanged: (val){
-                  setState(() {
-                    email = val ;
-                  });
-                },
                 validator: (val){
                   if(val!.isEmpty){
                     return 'Please enter your email';
@@ -131,11 +130,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     color: Theme.of(context).colorScheme.secondary,),
                 ),
                 obscureText: true,
-                onChanged: (val){
-                  setState(() {
-                    password = val;
-                  });
-                },
                 validator: (val){
                     if(val!.length < 6){
                       return 'Password must be at least 6 characters';
@@ -155,11 +149,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     color: Theme.of(context).colorScheme.secondary,),
                 ),
                 obscureText: true,
-                onChanged: (val){
-                  setState(() {
-                    password = val;
-                  });
-                },
               ),
               const SizedBox(height: 15),
               // birthdate field over 15 year old
@@ -193,13 +182,19 @@ class _SignUpPageState extends State<SignUpPage> {
                     });
                   }
                 },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select your bithdate';
+                  }
+                  return null;
+                },
               ),
 
 
               const SizedBox(height: 15),
               //gender male and female selector
               DropdownButtonFormField<String>(
-                value: genderController.text.isNotEmpty ? genderController.text : null,
+                value: genderController.isNotEmpty ? genderController: null,
                 decoration: textInputDecoration.copyWith(
                   hintText: 'Gender',
                   prefixIcon: Icon(
@@ -213,7 +208,7 @@ class _SignUpPageState extends State<SignUpPage> {
                 ],
                 onChanged: (value) {
                   setState(() {
-                    genderController.text = value ?? '';
+                    genderController = value ?? '';
                   });
                 },
                 validator: (value) {
