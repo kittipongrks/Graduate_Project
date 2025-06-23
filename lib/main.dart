@@ -2,10 +2,10 @@ import 'package:dahcpplication/theme/theme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:dahcpplication/firebase_options.dart';
 import 'package:flutter/material.dart';
-import 'package:dahcpplication/pages/login_page.dart';
-import 'package:dahcpplication/pages/home_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dahcpplication/firebase_options.dart';
+import 'package:dahcpplication/pages/page.dart';
+import 'package:dahcpplication/navigation_menu.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,9 +36,9 @@ class MyApp extends StatelessWidget {
             );
           }
           if (snapshot.data != null) {
-            return const MyHomePage();
+            return const NavigationMenu(); // should be MyHomePage()
           }
-          return const LoginPage();
+          return const LoginPage(); //should be LoginPage() but for development im gonna make it like first page 
         },
       ),
     );
