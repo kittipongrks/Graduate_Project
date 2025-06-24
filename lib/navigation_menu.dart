@@ -33,10 +33,17 @@ class _NavigationMenu extends State<NavigationMenu> {
         currentIndex: _selectedIndex,
         type:BottomNavigationBarType.fixed,
         onTap: _navigeteBottomBar,
+        
         items: [
-        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-        BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Map'),
+        BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+        BottomNavigationBarItem(
+          icon: Badge(
+            label: Text('x'),
+            child: Icon(Icons.chat),
+          ),
+          label: 'Chat',
+        ),
+        BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
         BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
         
       ]),

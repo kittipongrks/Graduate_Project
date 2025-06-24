@@ -30,15 +30,11 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text("Home Page"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-            },
-          ),
-        ],
+        
       ),
+      body: Center(
+        child: Text("Welcome to Home Page!"),
+        ),
     );
   }
 }

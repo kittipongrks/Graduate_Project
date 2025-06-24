@@ -36,7 +36,7 @@ class MyApp extends StatelessWidget {
             );
           }
           if (snapshot.data != null) {
-            return const NavigationMenu(); // should be MyHomePage()
+            return const NavigationMenu(); // should be NavigationMenu()
           }
           return const LoginPage(); //should be LoginPage() but for development im gonna make it like first page 
         },
