@@ -1,7 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-// ...existing import...
+import 'package:dahcpplication/controller/controller.dart';
+
 class MyChatPage extends StatefulWidget {
   const MyChatPage({super.key});
 
@@ -11,7 +10,8 @@ class MyChatPage extends StatefulWidget {
 
 class _MyChatPageState extends State<MyChatPage> {
   final TextEditingController _messageController = TextEditingController();
-  final List<Map<String, dynamic>> _messages = []; // เก็บข้อความและฝั่ง
+  final List<Map<String, dynamic>> _messages = [];
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +53,11 @@ class _MyChatPageState extends State<MyChatPage> {
               },
             ),
           ),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: CircularProgressIndicator(),
+            ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             color: Colors.grey[200],
@@ -73,24 +78,43 @@ class _MyChatPageState extends State<MyChatPage> {
                 IconButton(
                   icon: const Icon(Icons.send),
                   color: Theme.of(context).colorScheme.primary,
-                  onPressed: () {
-                    if (_messageController.text.trim().isNotEmpty) {
+                  // เมื่อมีการกดปุ่มส่งข้อความ
+                  onPressed: () async {
+                    if (_messageController.text.trim().isNotEmpty && !_isLoading) {
+                      final userMessage = _messageController.text.trim();
                       setState(() {
                         _messages.add({
-                          'text': _messageController.text.trim(),
-                          'isMe': true, // ข้อความของเรา
+                          'text': userMessage,
+                          'isMe': true,
                         });
-                        // ตัวอย่าง: เพิ่มข้อความฝั่งตรงข้ามอัตโนมัติ (ลบออกได้)
-                        Future.delayed(const Duration(milliseconds: 500), () {
-                          setState(() {
-                            _messages.add({
-                              'text': "ตอบกลับ: ${_messageController.text.trim()}",
-                              'isMe': false, // ข้อความของอีกฝั่ง
-                            });
-                          });
-                        });
+                        _isLoading = true;
                         _messageController.clear();
                       });
+
+                      try {
+                        final geminiReply = await callGemini(userMessage).timeout(
+                          const Duration(seconds: 10),
+                          onTimeout: () => 'เกิดข้อผิดพลาด: Gemini ใช้เวลาตอบนานเกินไป',
+                        );
+
+                        setState(() {
+                          _messages.add({
+                            'text': geminiReply,
+                            'isMe': false,
+                          });
+                        });
+                      } catch (e) {
+                        setState(() {
+                          _messages.add({
+                            'text': 'เกิดข้อผิดพลาด: $e',
+                            'isMe': false,
+                          });
+                        });
+                      } finally {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                      }
                     }
                   },
                 ),
