@@ -9,7 +9,9 @@ Future<String> callGemini(String prompt) async {
   final headers = {
     'Content-Type': 'application/json',
   };
-
+  prompt = '''[บทบาทของคุณ: คุณคือ AI ผู้ช่วยด้านสุขภาพที่เป็นมิตรและให้ข้อมูลเบื้องต้นอย่างระมัดระวัง] 
+[คำถามของผู้ใช้]:$prompt''';
+  
   final body = jsonEncode({
     "contents": [
       {
