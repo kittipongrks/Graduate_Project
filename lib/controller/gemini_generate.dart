@@ -2,8 +2,19 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+final Map<String , dynamic> models = {
+  'gemini-2.0-flash-lite':{
+    'endpoint': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent',
+  },
+  'gemini-2.0-flash':{
+    'endpoint': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent',
+  },
+  'gemini-2.5-pro':{
+    'endpoint': 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent',
+  },
+};
 
-Future<String> callGemini(String prompt) async {
+Future<String> callModelLLMs(String prompt) async {
   final apiKey = dotenv.env['GEMINI_API_KEY'];
   final endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=$apiKey';
   final headers = {
