@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class SettingPage extends StatelessWidget{
+class AccountPage extends StatelessWidget{
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Setting Page'),
+        title: Text('Account Page'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -18,7 +18,7 @@ class SettingPage extends StatelessWidget{
       ),
       
       body: Center(
-        child: Text('Setting content goes here'),
+        child: Text('Account content goes here'),
       ),
     );
   }

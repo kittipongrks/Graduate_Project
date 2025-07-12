@@ -1,4 +1,5 @@
-
+import 'package:dahcpplication/pages/chat_page.dart';
+import 'package:dahcpplication/pages/chat_diagnosis_page.dart';
 import 'package:flutter/material.dart';
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -40,9 +41,12 @@ class _MyHomePageState extends State<MyHomePage> {
                     children: [
                       const Text(
                         'สวัสดี คุณ..',
-                        style: TextStyle(fontSize: 18),
+                        style: TextStyle(fontSize: 20 , fontWeight: FontWeight.bold),
+                        
                       ),
+                      
                     ],
+                    
                   ),
                   const SizedBox(height: 12),
 
@@ -57,8 +61,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   const SizedBox(height: 16),
 
                   const Text(
-                    'some text',
-                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                    'มีอะไรให้เราช่วยเหลือ?',
+                    style: TextStyle(fontSize: 16),
                   ),
                   const SizedBox(height: 8),
 
@@ -66,28 +70,74 @@ class _MyHomePageState extends State<MyHomePage> {
                   Row(
                     children: [
                       Expanded(
-                        child: Container(
-                          height: 40,
-                          margin: const EdgeInsets.only(right: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue[100],
-                            borderRadius: BorderRadius.circular(8),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => ChatDiagnosisPage()),
+                            );
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                children: [
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.psychology, color: Colors.blue),
+                                      const SizedBox(width: 8),
+                                      Text("ตรวจโรคด้วยระบบ AI"),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
                       Expanded(
-                        child: Container(
-                          height: 40,
-                          margin: const EdgeInsets.only(left: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.green[100],
-                            borderRadius: BorderRadius.circular(8),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(8),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => MyChatPage()),
+                            );
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.green[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Column(
+                                children: [
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.chat, color: Colors.blue),
+                                      const SizedBox(width: 8),
+                                      Text("Chatbot AI Doctor"),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 15),
 
                   // กล่องใหญ่ด้านล่าง
                   Container(

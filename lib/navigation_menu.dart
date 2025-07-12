@@ -22,31 +22,48 @@ class _NavigationMenu extends State<NavigationMenu> {
     MyHomePage(),
     MyChatPage(),
     MyMapPage(),
-    SettingPage(),
+    AccountPage(),
     
   ];
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(children: _pages, index: _selectedIndex),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        type:BottomNavigationBarType.fixed,
-        onTap: _navigeteBottomBar,
-        
-        items: [
-        BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-        BottomNavigationBarItem(
-          icon: Badge(
-            label: Text('x'),
-            child: Icon(Icons.chat),
-          ),
-          label: 'Chat',
+      bottomNavigationBar: Container(
+        margin: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 2), // changes position of shadow
+            ),
+          ],
         ),
-        BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
-        BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
-        
-      ]),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BottomNavigationBar(
+            currentIndex: _selectedIndex,
+            type: BottomNavigationBarType.fixed,
+            onTap: _navigeteBottomBar,
+            
+            items: [
+              BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
+              BottomNavigationBarItem(
+                icon: Badge(
+                  label: Text('x'),
+                  child: Icon(Icons.chat),
+                ),
+                label: 'Chat',
+              ),
+              BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
+              BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
