@@ -42,22 +42,42 @@ class _MyChatPageState extends State<MyChatPage> {
                     final isMe = _messages[index]['isMe'] as bool;
                     return Align(
                       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(vertical: 4),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isMe ? Colors.green[100] : Colors.blue[100],
-                          borderRadius: BorderRadius.only(
-                            topLeft: const Radius.circular(15),
-                            topRight: const Radius.circular(15),
-                            bottomLeft: isMe ? const Radius.circular(15) : const Radius.circular(0),
-                            bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(15),
-                          ),
-                        ),
-                        child: Text(_messages[index]['text'],
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.black),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min, // Ensure Row takes minimum space
+                          crossAxisAlignment: CrossAxisAlignment.end, // Align text with avatar bottom
+                          children: [
+                            if (!isMe) // Show avatar only for messages from others
+                              const Padding(
+                                padding: EdgeInsets.only(right: 6.0),
+                                child: CircleAvatar(
+                                  radius: 18, // Adjust size as needed
+                                  backgroundColor: Colors.grey, // Placeholder color
+                                  backgroundImage: AssetImage('assets/images/Doctor_image_1per1.png'), // ใช้รูปภาพแทน Icon
+                                ),
+                              ),
+                            Container(
+                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7), // Limit message width
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isMe ? Colors.green[100] : Colors.blue[100],
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(15),
+                                  topRight: const Radius.circular(15),
+                                  bottomLeft: isMe ? const Radius.circular(15) : const Radius.circular(0),
+                                  bottomRight: isMe ? const Radius.circular(0) : const Radius.circular(15),
+                                ),
+                              ),
+                              child: Text(
+                                _messages[index]['text'],
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );

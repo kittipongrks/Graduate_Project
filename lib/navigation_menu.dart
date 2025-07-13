@@ -28,7 +28,7 @@ class _NavigationMenu extends State<NavigationMenu> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(children: _pages, index: _selectedIndex),
+      body: IndexedStack(index: _selectedIndex, children: _pages),
       bottomNavigationBar: Container(
         margin: const EdgeInsets.all(10),
         decoration: BoxDecoration(
