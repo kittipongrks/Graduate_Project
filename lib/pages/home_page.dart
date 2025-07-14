@@ -1,6 +1,9 @@
 import 'package:dahcpplication/pages/chat_page.dart';
 import 'package:dahcpplication/pages/chat_diagnosis_page.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:dahcpplication/controller/controllerPatient.dart';
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
@@ -8,152 +11,178 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
+Future<void> fetchUserInfo() async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) {
+    print("ยังไม่ได้ login");
+    return;
+  }
+
+  final email = user.email;
+
+  final doc = await FirebaseFirestore.instance
+      .collection('Users')
+      .doc(email)
+      .get();
+
+  final age = calculateAge(doc.data()?['birthdate'] ?? Timestamp.fromDate(DateTime(2000, 1, 1))); // Default is Age 25
+
+  if (doc.exists) {
+    final data = doc.data();
+    print('ข้อมูลของผู้ใช้:');
+    print('Email: ${data?['email']}');
+    print('เพศ: ${data?['gender']}');
+    print('วันเกิด: ${data?['birthdate']}');
+    print('อายุ: $age ปี');
+  } else {
+    print('ไม่พบข้อมูลใน Firestore ของ email: $email');
+  }
+}
 class _MyHomePageState extends State<MyHomePage> {
+  String? userEmail;
+  int? age ;
+  String? gender;
+  DateTime? birthdate;
+  @override
+  void initState(){
+    super.initState();
+    //fetchUserInfo(); // เรียกข้อมูลผู้ใช้เมื่อเริ่มต้น
+  } 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).bottomNavigationBarTheme.backgroundColor,
-      body: Column(
-        children: [
-          // 🔴 ภาพด้านบนสุด (กรอบแดงในภาพ)
-          Container(
-            height: 180,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/header_home_page.png'),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-
-          // 🔻 ส่วนเนื้อหาข้างล่าง
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header: Avatar + Greeting
+              Row(
                 children: [
-                  const SizedBox(height: 16),
-
-                  // แถว: รูปโปรไฟล์เล็ก + สวัสดี คุณ...
-                  Row(
+                  CircleAvatar(
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    radius: 24,
+                    child: Icon(Icons.person, color: Colors.white),
+                  ),
+                  SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'สวัสดี คุณ..',
-                        style: TextStyle(fontSize: 20 , fontWeight: FontWeight.bold),
-                        
-                      ),
-                      
-                    ],
-                    
-                  ),
-                  const SizedBox(height: 12),
-
-                  // กล่อง TextField หรือ Input
-                  Container(
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Text(
-                    'มีอะไรให้เราช่วยเหลือ?',
-                    style: TextStyle(fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // ปุ่ม 2 อันในแนวนอน
-                  Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => ChatDiagnosisPage()),
-                            );
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.blue[100],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                children: [
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.psychology, color: Colors.blue),
-                                      const SizedBox(width: 8),
-                                      Text("ตรวจโรคด้วยระบบ AI"),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(8),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => MyChatPage()),
-                            );
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.green[100],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Column(
-                                children: [
-                                  Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.chat, color: Colors.blue),
-                                      const SizedBox(width: 8),
-                                      Text("Chatbot AI Doctor"),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+                      Text("สวัสดีคุณ ", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Theme.of(context).colorScheme.primary)),
+                      Text("วันนี้มีอะไรให้เราช่วยไหม ?", style: TextStyle(fontSize: 14)),
                     ],
                   ),
-                  const SizedBox(height: 15),
-
-                  // กล่องใหญ่ด้านล่าง
-                  Container(
-                    height: 80,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.orange[100],
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
+                  Spacer(),
                 ],
               ),
-            ),
+
+              SizedBox(height: 20),
+
+              // Search Bar
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: "Search",
+                    border: InputBorder.none,
+                    icon: Icon(Icons.search),
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 20),
+
+              // Categories Title
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("ประเภท", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                ],
+              ),
+
+              SizedBox(height: 12),
+
+              // Category Cards
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildCategoryCard("Doctor AI", Icons.health_and_safety, Colors.purple[200]! , onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => MyChatPage()),);
+                  },),
+                  _buildCategoryCard("Diagnosis", Icons.medical_information, Colors.blue[200]! , onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => ChatDiagnosisPage()),);
+                  },),
+                  _buildCategoryCard("History", Icons.favorite, Colors.green[200]! , onTap: () {
+                    // Navigate to history page
+                    // Navigator.push(context, MaterialPageRoute(builder: (context) => HistoryPage()),);
+                  },),
+                ],
+              ),
+
+              SizedBox(height: 24),
+
+              // Health News
+              Text("ข่าวสารทั่วไป", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+
+              SizedBox(height: 12),
+
+              // Covid-19 Card
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Covid-19 Update", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    SizedBox(height: 8),
+                    Text("Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod...", style: TextStyle(fontSize: 14)),
+                    SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      ),
+                      child: Text("Read More" , style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
+        ),
+      ),
+    );
+  }
+  Widget _buildCategoryCard(String title, IconData icon, Color bgColor , {VoidCallback? onTap}) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: onTap,
+      child : Container(
+      width: 110,
+      padding: EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 32, color: Colors.white),
+          SizedBox(height: 5),
+          Text(title, textAlign: TextAlign.center, style: TextStyle(color: Colors.white ) ),
         ],
       ),
+    )
     );
   }
 }

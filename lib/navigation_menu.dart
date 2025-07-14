@@ -51,14 +51,8 @@ class _NavigationMenu extends State<NavigationMenu> {
             
             items: [
               BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-              BottomNavigationBarItem(
-                icon: Badge(
-                  label: Text('x'),
-                  child: Icon(Icons.chat),
-                ),
-                label: 'Chat',
-              ),
-              BottomNavigationBarItem(icon: Icon(Icons.map), label: 'Map'),
+              BottomNavigationBarItem(icon : Icon(Icons.chat_rounded),label: 'Chat',),
+              BottomNavigationBarItem(icon: Icon(Icons.add_location_rounded), label: 'Map'),
               BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Account'),
             ],
           ),
