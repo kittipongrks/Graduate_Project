@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MyMapPage extends StatefulWidget {
   @override
@@ -9,35 +10,97 @@ class MyMapPage extends StatefulWidget {
 
 class _MyMapPageState extends State<MyMapPage> {
   late GoogleMapController mapController;
-  LatLng _center = LatLng(13.7563, 100.5018); // Bangkok
+  LatLng? _center;
   final Set<Marker> _markers = {};
   Position? _currentPosition;
+  String _selectedCategory = 'All';
 
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
-  }
-
-  void _getCurrentLocation() async {
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-    setState(() {
-      _currentPosition = position;
-      _center = LatLng(position.latitude, position.longitude);
-      _markers.add(
-        Marker(
-          markerId: MarkerId('me'),
-          position: _center,
-          infoWindow: InfoWindow(title: 'You are here'),
-        ),
-      );
+    Future.microtask(() async {
+      await _getCurrentLocation();
+      await loadMarkersFromFirestore();
     });
   }
 
   void _onMapCreated(GoogleMapController controller) {
     mapController = controller;
+  }
+
+  Future<void> _getCurrentLocation() async {
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Location permission denied')));
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Location permission permanently denied')),
+      );
+      return;
+    }
+
+    try {
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      LatLng userLatLng = LatLng(position.latitude, position.longitude);
+
+      setState(() {
+        _currentPosition = position;
+        _center = userLatLng;
+        _markers
+          ..removeWhere((m) => m.markerId == MarkerId('me'))
+          ..add(
+            Marker(
+              markerId: MarkerId('me'),
+              position: userLatLng,
+              infoWindow: InfoWindow(title: 'You are here'),
+            ),
+          );
+      });
+
+      if (mapController != null) {
+        mapController.animateCamera(CameraUpdate.newLatLngZoom(userLatLng, 16));
+      }
+    } catch (e) {
+      print('Error getting location: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('ไม่สามารถดึงตำแหน่งได้')));
+    }
+  }
+
+  Future<void> loadMarkersFromFirestore([String? category]) async {
+    final query = FirebaseFirestore.instance.collection('places');
+    final snapshot =
+        category == null || category == 'All'
+            ? await query.get()
+            : await query.where('category', isEqualTo: category).get();
+
+    final newMarkers =
+        snapshot.docs.map((doc) {
+          final data = doc.data();
+          final LatLng position = LatLng(data['latitude'], data['longitude']);
+          return Marker(
+            markerId: MarkerId(doc.id),
+            position: position,
+            infoWindow: InfoWindow(title: data['name']),
+            onTap: () => _onMarkerTapped(position),
+          );
+        }).toSet();
+
+    setState(() {
+      _markers.removeWhere((m) => m.markerId != MarkerId('me'));
+      _markers.addAll(newMarkers);
+    });
   }
 
   void _onMarkerTapped(LatLng position) {
@@ -59,17 +122,20 @@ class _MyMapPageState extends State<MyMapPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_center == null) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Nearby Health Places')),
+        body: Center(child: CircularProgressIndicator()), // ✅ โหลดตำแหน่ง
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Nearby Health Places'),
-        backgroundColor: Colors.teal,
         actions: [
           IconButton(
             icon: Icon(Icons.my_location),
-            onPressed:
-                () => mapController.animateCamera(
-                  CameraUpdate.newLatLng(_center),
-                ),
+            onPressed: _getCurrentLocation,
           ),
         ],
       ),
@@ -77,15 +143,8 @@ class _MyMapPageState extends State<MyMapPage> {
         children: [
           GoogleMap(
             onMapCreated: _onMapCreated,
-            initialCameraPosition: CameraPosition(target: _center, zoom: 14.0),
-            markers:
-                _markers
-                    .map(
-                      (m) => m.copyWith(
-                        onTapParam: () => _onMarkerTapped(m.position),
-                      ),
-                    )
-                    .toSet(),
+            initialCameraPosition: CameraPosition(target: _center!, zoom: 14.0),
+            markers: _markers,
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
           ),
@@ -102,7 +161,7 @@ class _MyMapPageState extends State<MyMapPage> {
               ),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
-                  value: 'All',
+                  value: _selectedCategory,
                   items:
                       ['All', 'Pharmacy', 'Clinic', 'Hospital']
                           .map(
@@ -113,7 +172,10 @@ class _MyMapPageState extends State<MyMapPage> {
                           )
                           .toList(),
                   onChanged: (value) {
-                    // TODO: implement filter logic
+                    if (value != null) {
+                      setState(() => _selectedCategory = value);
+                      loadMarkersFromFirestore(value);
+                    }
                   },
                 ),
               ),
