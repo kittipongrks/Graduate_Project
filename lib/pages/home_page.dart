@@ -1,9 +1,7 @@
 import 'package:dahcpplication/pages/chat_page.dart';
 import 'package:dahcpplication/pages/chat_diagnosis_page.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:dahcpplication/controller/controllerPatient.dart';
+import 'package:dahcpplication/auth/database.dart';
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
 
@@ -11,33 +9,6 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
-Future<void> fetchUserInfo() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) {
-    print("ยังไม่ได้ login");
-    return;
-  }
-
-  final email = user.email;
-
-  final doc = await FirebaseFirestore.instance
-      .collection('Users')
-      .doc(email)
-      .get();
-
-  final age = calculateAge(doc.data()?['birthdate'] ?? Timestamp.fromDate(DateTime(2000, 1, 1))); // Default is Age 25
-
-  if (doc.exists) {
-    final data = doc.data();
-    print('ข้อมูลของผู้ใช้:');
-    print('Email: ${data?['email']}');
-    print('เพศ: ${data?['gender']}');
-    print('วันเกิด: ${data?['birthdate']}');
-    print('อายุ: $age ปี');
-  } else {
-    print('ไม่พบข้อมูลใน Firestore ของ email: $email');
-  }
-}
 class _MyHomePageState extends State<MyHomePage> {
   String? userEmail;
   int? age ;
@@ -117,7 +88,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   _buildCategoryCard("Diagnosis", Icons.medical_information, Colors.blue[200]! , onTap: () {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => ChatDiagnosisPage()),);
                   },),
-                  _buildCategoryCard("History", Icons.favorite, Colors.green[200]! , onTap: () {
+                  _buildCategoryCard("History", Icons.history_rounded, Colors.green[200]! , onTap: () {
                     // Navigate to history page
                     // Navigator.push(context, MaterialPageRoute(builder: (context) => HistoryPage()),);
                   },),
