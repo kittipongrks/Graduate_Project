@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:dahcpplication/controller/controller.dart';
 import 'package:dahcpplication/controller/infermedica_api.dart';
 import 'package:dahcpplication/auth/database.dart';
+import 'package:dahcpplication/controller/accessapi.dart';
 
 class ChatDiagnosisPage extends StatefulWidget{
   const ChatDiagnosisPage({super.key});
@@ -158,7 +159,7 @@ class ChatDiagnosisPage extends StatefulWidget{
                               print("appId : $appId");
                               print("appKey : $appKey");
                               print("User : $case_id");
-                              final infermedicaMessage = await read_complaints(
+                              final mentions = await read_complaints(
                               age,
                               sex,
                               appId,
@@ -166,6 +167,16 @@ class ChatDiagnosisPage extends StatefulWidget{
                               case_id,
                               userMessageEng,
                             );
+                              final evidence = await mentionsToEvidence(mentions);
+                              final infermedicaMessage = await conduct_interview(
+                                evidence,
+                                age,
+                                sex,
+                                case_id,
+                                appId,
+                                appKey,
+                                );
+                              
                                //Call Infermedica API 
                               setState(() {
                                 _messages.add({'text': infermedicaMessage, 'isMe': false});

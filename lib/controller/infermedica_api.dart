@@ -136,7 +136,6 @@ Future<List<dynamic>> conduct_interview(
       case_id,
       appId,
       appKey,
-      languageModel: languageModel,
     );
 
     final questionStruct = resp['question'];
@@ -263,3 +262,4 @@ void summariseTriage(Map<String, dynamic> triageResp) {
 
 
 //// Custom function by me 
+///
