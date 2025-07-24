@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-
+import 'package:dahcpplication/controller/gemini_generate.dart';
+import 'package:dahcpplication/auth/database.dart';
 // -----------------------------------------------------------------------------
 // CONFIG
 // -----------------------------------------------------------------------------
@@ -16,6 +17,7 @@ final infermedicaAppKey = dotenv.env['INFERMEDICA_APP_KEY'] ?? '';
 // อายุ/เพศของผู้ใช้ (ในระบบจริงคุณดึงจากโปรไฟล์หรือให้ user กรอก)
 const int defaultAge = 30; // ตัวอย่าง
 const String defaultSex = 'male'; // 'male' | 'female'
+
 
 // -----------------------------------------------------------------------------
 // CHAT MODELS
@@ -309,13 +311,14 @@ class InfermedicaChatController extends ChangeNotifier {
 
     // If we are currently answering a follow‑up question expecting yes/no/maybe,
     // try to map quick answer directly to evidence for that pending question.
+    rawUserText = await llmsChangeThaiToEng(rawUserText);
     if (_lastDiagnosis?.question != null) {
       final q = _lastDiagnosis!.question!;
       final EvidenceChoice? mapped = _mapUserQuickAnswer(rawUserText);
       if (mapped != null && q.items.isNotEmpty) {
         // apply same choice to all items in the question (simple case).
         for (final item in q.items) {
-          _upsertEvidence(item.id, mapped, source: 'question');
+          _upsertEvidence(item.id, mapped, source: 'suggest');
         }
         await _runDiagnosisCycle();
         return;
@@ -406,20 +409,22 @@ class InfermedicaChatController extends ChangeNotifier {
 
       if (dx.isFinished) {
         // No more questions -> show conditions & triage.
-        final summary = _buildFinalSummaryText(dx);
+        final summaryEn = _buildFinalSummaryText(dx);
+        final summaryTh = await llmsChangeEngToThai(summaryEn);
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
-          text: summary,
+          text: summaryTh,
           payload: {'diagnosis': dx},
         ));
       } else {
         // Show follow‑up question.
-        final qText = _buildQuestionDisplayText(dx.question!);
+        final qTextEn = _buildQuestionDisplayText(dx.question!);
+        final qTextTh = await llmsChangeEngToThai(qTextEn);
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
-          text: qText,
+          text: qTextTh,
           payload: {'question': dx.question},
         ));
       }
@@ -446,7 +451,6 @@ class InfermedicaChatController extends ChangeNotifier {
       for (final item in q.items) {
         buf.writeln('- ${item.name}');
       }
-      buf.writeln('\nตอบ: yes / no / maybe');
     }
     return buf.toString().trim();
   }
@@ -506,6 +510,8 @@ class _InfermedicaChatScreenState extends State<InfermedicaChatScreen> {
   late final InfermedicaChatController _controller;
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
+  int age = defaultAge;
+  String sex = defaultSex;
 
   @override
   void initState() {
@@ -514,6 +520,17 @@ class _InfermedicaChatScreenState extends State<InfermedicaChatScreen> {
     _controller.addListener(_onControllerChanged);
     // Initial greeting
     _controller.addSystemMessage('สวัสดี! กรุณาพิมพ์อาการของคุณเป็นภาษาไทยหรืออังกฤษ.');
+    fetchUserInfo();
+  }
+
+  Future<void> loadUserInfo() async {
+    final document = await fetchUserInfo();
+    if (document != null) {
+      setState(() {
+        age = document['age'];
+        sex = document['sex'];
+      });
+    }
   }
 
   @override
