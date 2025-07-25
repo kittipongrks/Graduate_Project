@@ -115,7 +115,7 @@ class InfermedicaService {
     required List<EvidenceItem> evidence,
     required int age,
     required String sex,
-    bool noGroups = false,
+    bool noGroups = true,
   }) async {
     final uri = Uri.parse('$infermedicaBaseUrl/diagnosis');
     final body = utf8.encode(jsonEncode({
@@ -123,6 +123,9 @@ class InfermedicaService {
       'sex': sex,
       'evidence': evidence.map((e) => e.toJson()).toList(),
       // 'extras': { ... } // e.g., enable triage, suggestions, etc.
+      'extras': {
+            'disable_groups': noGroups,
+        }
     }));
     print('DIAGNOSIS BODY => ${jsonEncode({
     'age': {'value': age, 'unit': 'year'},
@@ -131,6 +134,7 @@ class InfermedicaService {
   })}');
 
     final resp = await _client.post(uri, headers: _headers(), body: body);
+    print(resp.body);
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       final Map<String, dynamic> data = jsonDecode(resp.body);
       return DiagnosisResult.fromJson(data);
@@ -403,7 +407,7 @@ class InfermedicaChatController extends ChangeNotifier {
         evidence: _evidence,
         age: age,
         sex: sex,
-        noGroups: false,
+        noGroups: true,
       );
       _lastDiagnosis = dx;
 
@@ -488,7 +492,7 @@ class InfermedicaChatController extends ChangeNotifier {
     if (['n', 'no', 'ไม่', 'ไม่มี', 'absent', 'false', '0'].contains(t)) {
       return EvidenceChoice.absent;
     }
-    if (['m', 'maybe', 'ไม่แน่ใจ', 'unknown', 'ไม่ทราบ'].contains(t)) {
+    if (['m', 'maybe', 'ไม่แน่ใจ', 'unknown', 'ไม่ทราบ' , 'อาจจะ'].contains(t)) {
       return EvidenceChoice.unknown;
     }
     return null; // not a quick answer
@@ -566,72 +570,134 @@ class _InfermedicaChatScreenState extends State<InfermedicaChatScreen> {
   Widget build(BuildContext context) {
     final msgs = _controller.messages;
     return Scaffold(
-      appBar: AppBar(title: const Text('Infermedica Chat Demo')),
-      body: Column(
+      appBar: AppBar(
+        automaticallyImplyLeading: true,
+        title: Row(
+          children: [
+            const SizedBox(width: 10),
+            const Text(
+              "Diagnosis",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        foregroundColor: Colors.white,
+      ),
+      body: SafeArea(
+  child: Padding(
+    padding: const EdgeInsets.all(16),
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
         children: [
+          // Chat messages
           Expanded(
             child: ListView.builder(
-              controller: _scrollCtrl,
-              itemCount: msgs.length,
+              controller: _scrollCtrl, // ใช้ _scrollCtrl เหมือนเดิม
+              padding: const EdgeInsets.all(16),
+              itemCount: msgs.length, // ใช้ msgs.length เหมือนเดิม
               itemBuilder: (context, i) {
-                final m = msgs[i];
-                final align = m.sender == ChatSender.user
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft;
-                final color = switch (m.sender) {
-                  ChatSender.user => Colors.blue.shade200,
-                  ChatSender.bot => Colors.green.shade200,
+                final m = msgs[i]; // ใช้ m = msgs[i] เหมือนเดิม
+                final isMe = m.sender == ChatSender.user; // กำหนด isMe จาก m.sender
+                final color = switch (m.sender) { // ใช้ color switch เหมือนเดิม
+                  ChatSender.user => Colors.green.shade100, // เปลี่ยนสีตามตัวอย่าง
+                  ChatSender.bot => Colors.blue.shade100, // เปลี่ยนสีตามตัวอย่าง
                   ChatSender.system => Colors.grey.shade300,
                   ChatSender.error => Colors.red.shade200,
                 };
+
                 return Align(
-                  alignment: align,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(12),
+                  alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        if (!isMe)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 6.0),
+                            child: CircleAvatar(
+                              radius: 18,
+                              backgroundColor: Colors.grey,
+                              backgroundImage: AssetImage('assets/images/Doctor_image_1per1.png'), // หากมีรูปภาพ
+                            ),
+                          ),
+                        Container(
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(15),
+                              topRight: const Radius.circular(15),
+                              bottomLeft: isMe ? const Radius.circular(15) : Radius.zero,
+                              bottomRight: isMe ? Radius.zero : const Radius.circular(15),
+                            ),
+                          ),
+                          child: Text(
+                            m.text, // ใช้ m.text เหมือนเดิม
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                        ),
+                      ],
                     ),
-                    child: Text(m.text),
                   ),
                 );
               },
             ),
           ),
-          if (_controller.isBusy)
+
+          if (_controller.isBusy) // ใช้ _controller.isBusy เหมือนเดิม
             const Padding(
               padding: EdgeInsets.all(8.0),
               child: CircularProgressIndicator(),
             ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _textCtrl,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendCurrentText(),
-                      decoration: const InputDecoration(
-                        hintText: 'พิมพ์ข้อความ...',
-                        border: OutlineInputBorder(),
+
+          // Input box
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).bottomNavigationBarTheme.backgroundColor ?? Colors.grey[200], // ใส่ค่า default หากเป็น null
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _textCtrl, // ใช้ _textCtrl เหมือนเดิม
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _sendCurrentText(), // ใช้ _sendCurrentText() เหมือนเดิม
+                    decoration: InputDecoration(
+                      hintText: "พิมพ์ข้อความของคุณ...",
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
                       ),
+                      contentPadding: const EdgeInsets.all(12),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: _sendCurrentText,
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.send),
+                  color: Theme.of(context).colorScheme.primary,
+                  onPressed: _sendCurrentText, // ใช้ _sendCurrentText() เหมือนเดิม
+                ),
+              ],
             ),
           ),
         ],
       ),
+    ),
+  ),
+),
     );
   }
 }

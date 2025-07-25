@@ -61,8 +61,8 @@ Future<String> callModelLLMs(String prompt) async {
 }
 // Function to change English to Thai using LLMs
 Future<String> llmsChangeEngToThai(String prompt) async {
-  prompt = """ แปลภาษาอังกฤษเป็นภาษาไทยโดยให้มีความเป็นธรรมชาติให้เหมาะสมสำหรับการนำไปใช้ 
-  infermedica โดยไม่ต้องใส่รายละเอียดเพิ่มเติม **เอาแค่คำแปล** และนี่คือ prompt: $prompt""";
+  prompt = """ แปลภาษาอังกฤษเป็นภาษาไทยโดยให้มีความเป็นธรรมชาติ คนทั่วไปสามารถอ่านเข้าใจได้
+   โดยไม่ต้องใส่รายละเอียดเพิ่มเติม **เอาแค่คำแปล** และนี่คือ prompt: $prompt""";
 
   final body = jsonEncode({
     "contents": [
