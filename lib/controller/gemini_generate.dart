@@ -130,3 +130,60 @@ Future<String> llmsChangeThaiToEng(String prompt) async {
     return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${responseEngtoThai.body}';
   }
 }
+
+
+Future<String> translateChangeThaiToEng(String prompt) async {
+  final url = Uri.parse("https://libretranslate.com/translate");
+
+  final response = await http.post(
+    url,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode({
+      "q": "$prompt",
+      "source": "auto",
+      "target": "en",
+      "format": "text",
+      "alternatives": 3,
+      "api_key": ""
+    }),
+  );
+
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    print(data);
+    return data['translatedText'] ?? 'ไม่พบข้อความแปล';
+  } else {
+    print("Error: ${response.statusCode}");
+    return 'เกิดข้อผิดพลาดในการแปล: ${response.statusCode}';
+  }
+}
+
+Future<String> translateChangeEngToThai(String prompt) async {
+  final url = Uri.parse("https://libretranslate.com/translate");
+
+  final response = await http.post(
+    url,
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: jsonEncode({
+      "q": "$prompt",
+      "source": "auto",
+      "target": "th",
+      "format": "text",
+      "alternatives": 3,
+      "api_key": ""
+    }),
+  );
+
+  if (response.statusCode == 200) {
+    final data = jsonDecode(response.body);
+    print(data);
+    return data['translatedText'] ?? 'ไม่พบข้อความแปล';
+  } else {
+    print("Error: ${response.statusCode}");
+    return 'เกิดข้อผิดพลาดในการแปล: ${response.statusCode}';
+  }
+}

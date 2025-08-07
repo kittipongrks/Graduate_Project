@@ -21,7 +21,7 @@ class _NavigationMenu extends State<NavigationMenu> {
 
   final List<Widget> _pages = [
     MyHomePage(),
-    InfermedicaChatScreen(),
+    ChatDiagnosisPage(),
     MyMapPage(),
     AccountPage(),
     

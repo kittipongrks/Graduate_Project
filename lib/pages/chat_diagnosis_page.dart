@@ -315,7 +315,6 @@ class InfermedicaChatController extends ChangeNotifier {
 
     // If we are currently answering a follow‑up question expecting yes/no/maybe,
     // try to map quick answer directly to evidence for that pending question.
-    rawUserText = await llmsChangeThaiToEng(rawUserText);
     if (_lastDiagnosis?.question != null) {
       final q = _lastDiagnosis!.question!;
       final EvidenceChoice? mapped = _mapUserQuickAnswer(rawUserText);
@@ -414,21 +413,22 @@ class InfermedicaChatController extends ChangeNotifier {
       if (dx.isFinished) {
         // No more questions -> show conditions & triage.
         final summaryEn = _buildFinalSummaryText(dx);
-        final summaryTh = await llmsChangeEngToThai(summaryEn);
+        // final summaryTh = await llmsChangeEngToThai(summaryEn); //change to thai
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
-          text: summaryTh,
+          text: summaryEn,
           payload: {'diagnosis': dx},
         ));
       } else {
         // Show follow‑up question.
         final qTextEn = _buildQuestionDisplayText(dx.question!);
-        final qTextTh = await llmsChangeEngToThai(qTextEn);
+        // final qTextTh = await llmsChangeEngToThai(qTextEn);
+        // change to thai
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
-          text: qTextTh,
+          text: qTextEn,
           payload: {'question': dx.question},
         ));
       }
@@ -439,6 +439,7 @@ class InfermedicaChatController extends ChangeNotifier {
     } finally {
       _isBusy = false;
       notifyListeners();
+      print(_isBusy);
     }
   }
 
@@ -451,11 +452,11 @@ class InfermedicaChatController extends ChangeNotifier {
     // For group questions, items could be multiple; we show bullet list.
     final buf = StringBuffer();
     buf.writeln(q.text);
-    if (q.items.isNotEmpty) {
-      for (final item in q.items) {
-        buf.writeln('- ${item.name}');
-      }
-    }
+    // if (q.items.isNotEmpty) {
+    //   for (final item in q.items) {
+    //     buf.writeln('- ${item.name}');
+    //   }
+    // }
     return buf.toString().trim();
   }
 

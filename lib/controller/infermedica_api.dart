@@ -17,7 +17,7 @@ Future<dynamic> getApiInfermedica() async{
 }
 
 Future<String> read_input(String prompt) async{
-  final response = await llmsChangeThaiToEng(prompt);
+  final response = await translateChangeEngToThai(prompt);
   return response;
 }
 

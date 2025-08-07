@@ -414,7 +414,7 @@ class InfermedicaChatController extends ChangeNotifier {
       if (dx.isFinished) {
         // No more questions -> show conditions & triage.
         final summaryEn = _buildFinalSummaryText(dx);
-        final summaryTh = await llmsChangeEngToThai(summaryEn);
+        final summaryTh = await translateChangeEngToThai(summaryEn);
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
@@ -424,7 +424,7 @@ class InfermedicaChatController extends ChangeNotifier {
       } else {
         // Show follow‑up question.
         final qTextEn = _buildQuestionDisplayText(dx.question!);
-        final qTextTh = await llmsChangeEngToThai(qTextEn);
+        final qTextTh = await translateChangeEngToThai(qTextEn);
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
