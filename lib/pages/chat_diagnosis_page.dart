@@ -367,6 +367,7 @@ class InfermedicaChatController extends ChangeNotifier {
   Future<void> _runParseThenDiagnosis(String processedUserText) async {
     _isBusy = true;
     notifyListeners();
+    processedUserText = await translateChangeThaiToEng(processedUserText);
     try {
       final parse = await service.parseText(
         text: processedUserText,
@@ -423,12 +424,12 @@ class InfermedicaChatController extends ChangeNotifier {
       } else {
         // Show follow‑up question.
         final qTextEn = _buildQuestionDisplayText(dx.question!);
-        // final qTextTh = await llmsChangeEngToThai(qTextEn);
+        final qTextTh = await translateChangeEngToThai(qTextEn);
         // change to thai
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
-          text: qTextEn,
+          text: qTextTh,
           payload: {'question': dx.question},
         ));
       }

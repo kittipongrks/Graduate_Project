@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 Future<void> translateText() async {
-  final url = Uri.parse("https://libretranslate.com/translate");
+  final url = Uri.parse("http://localhost:5000/translate");
 
   final response = await http.post(
     url,

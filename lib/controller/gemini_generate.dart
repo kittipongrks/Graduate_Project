@@ -133,7 +133,7 @@ Future<String> llmsChangeThaiToEng(String prompt) async {
 
 
 Future<String> translateChangeThaiToEng(String prompt) async {
-  final url = Uri.parse("https://libretranslate.com/translate");
+  final url = Uri.parse("http://10.0.2.2:5000/translate");
 
   final response = await http.post(
     url,
@@ -146,7 +146,6 @@ Future<String> translateChangeThaiToEng(String prompt) async {
       "target": "en",
       "format": "text",
       "alternatives": 3,
-      "api_key": ""
     }),
   );
 
@@ -161,7 +160,7 @@ Future<String> translateChangeThaiToEng(String prompt) async {
 }
 
 Future<String> translateChangeEngToThai(String prompt) async {
-  final url = Uri.parse("https://libretranslate.com/translate");
+  final url = Uri.parse("http://10.0.2.2:5000/translate");
 
   final response = await http.post(
     url,
@@ -174,7 +173,6 @@ Future<String> translateChangeEngToThai(String prompt) async {
       "target": "th",
       "format": "text",
       "alternatives": 3,
-      "api_key": ""
     }),
   );
 
