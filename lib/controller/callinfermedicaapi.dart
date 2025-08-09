@@ -1,8 +1,4 @@
-import 'package:uuid/uuid.dart';
-import 'package:dahcpplication/controller/accessapi.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:dahcpplication/controller/gemini_generate.dart';
-import 'package:flutter/foundation.dart';
 
 Future<dynamic> getApiInfermedica() async{
   final appId = dotenv.env['INFERMEDICA_APP_ID'];

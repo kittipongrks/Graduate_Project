@@ -59,10 +59,17 @@ Future<String> callModelLLMs(String prompt) async {
     return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${response.body}';
   }
 }
+
+
+
+
+
+
 // Function to change English to Thai using LLMs
 Future<String> llmsChangeEngToThai(String prompt) async {
-  prompt = """ แปลภาษาอังกฤษเป็นภาษาไทยโดยให้มีความเป็นธรรมชาติ คนทั่วไปสามารถอ่านเข้าใจได้
-   โดยไม่ต้องใส่รายละเอียดเพิ่มเติม **เอาแค่คำแปล** และนี่คือ prompt: $prompt""";
+  prompt = """ Translate the following English text into natural Thai that is easy for the general public to understand. 
+    Only output the translation without any additional details.
+    Text: $prompt""";
 
   final body = jsonEncode({
     "contents": [
@@ -94,11 +101,17 @@ Future<String> llmsChangeEngToThai(String prompt) async {
     return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${responseEngtoThai.body}';
   }
 }
+
+
+
+
+
+
 // Function to change Thai to English using LLMs
 Future<String> llmsChangeThaiToEng(String prompt) async {
-  prompt = """ เปลี่ยนภาษาไทยเป็นภาษาอังกฤษโดยให้มีข้อมูลที่เหมาะสมสำหรับ infermedica 
-  ไม่ต้องอธิบายเพิ่มเติม ถ้าเจอคำว่าประมาณว่า "ใช่" ให้แปลเป็น present ถ้าเจอ "ไม่" ให้แปลเป็น absent และถ้าไม่แน่ใจ ให้แปลเป็น unknown 
-  **เอาแค่คำแปล** และนี่คือ prompt: $prompt""";
+  prompt = """ Translate the $prompt into natural English suitable for Infermedica input. 
+    Only output the translated phrase without explanations. 
+    """;
 
   final body = jsonEncode({
     "contents": [
@@ -130,6 +143,9 @@ Future<String> llmsChangeThaiToEng(String prompt) async {
     return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${responseEngtoThai.body}';
   }
 }
+
+
+
 
 
 Future<String> translateChangeThaiToEng(String prompt) async {

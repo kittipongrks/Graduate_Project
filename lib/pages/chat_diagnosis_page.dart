@@ -317,7 +317,7 @@ class InfermedicaChatController extends ChangeNotifier {
     // try to map quick answer directly to evidence for that pending question.
     if (_lastDiagnosis?.question != null) {
       final q = _lastDiagnosis!.question!;
-      final EvidenceChoice? mapped = _mapUserQuickAnswer(rawUserText);
+      final EvidenceChoice? mapped = await _mapUserQuickAnswer(rawUserText);
       if (mapped != null && q.items.isNotEmpty) {
         // apply same choice to all items in the question (simple case).
         for (final item in q.items) {
@@ -367,7 +367,7 @@ class InfermedicaChatController extends ChangeNotifier {
   Future<void> _runParseThenDiagnosis(String processedUserText) async {
     _isBusy = true;
     notifyListeners();
-    processedUserText = await translateChangeThaiToEng(processedUserText);
+    processedUserText = await llmsChangeThaiToEng(processedUserText);
     try {
       final parse = await service.parseText(
         text: processedUserText,
@@ -424,7 +424,7 @@ class InfermedicaChatController extends ChangeNotifier {
       } else {
         // Show follow‑up question.
         final qTextEn = _buildQuestionDisplayText(dx.question!);
-        final qTextTh = await translateChangeEngToThai(qTextEn);
+        final qTextTh = await llmsChangeEngToThai(qTextEn);
         // change to thai
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
@@ -486,7 +486,7 @@ class InfermedicaChatController extends ChangeNotifier {
   // USER QUICK ANSWER MAPPING yes/no/maybe -> EvidenceChoice
   // ---------------------------------------------------------------------------
 
-  EvidenceChoice? _mapUserQuickAnswer(String text) {
+  Future<EvidenceChoice?> _mapUserQuickAnswer(String text) async{
     final t = text.trim().toLowerCase();
     if (['y', 'yes', 'ใช่', 'มี', 'present', 'true', '1'].contains(t)) {
       return EvidenceChoice.present;
@@ -497,7 +497,60 @@ class InfermedicaChatController extends ChangeNotifier {
     if (['m', 'maybe', 'ไม่แน่ใจ', 'unknown', 'ไม่ทราบ' , 'อาจจะ'].contains(t)) {
       return EvidenceChoice.unknown;
     }
-    return null; // not a quick answer
+
+    final prompt = """ Classify the user input as one of these keywords for Infermedica EvidenceChoice based on its meaning:
+      - If the input expresses a positive or affirmative meaning, respond with "present".
+      - If the input expresses a negative or denial meaning, respond with "absent".
+      - If the input expresses uncertainty or doubt, respond with "unknown".
+
+      Only output the exact keyword: present, absent, or unknown.
+
+      User input: $text """;
+
+      final body = jsonEncode({
+        "contents": [
+          {
+            "parts": [
+              {"text": prompt}
+            ]
+          }
+        ],
+      });
+      final response = await http.post(
+        Uri.parse(endpoint),
+        headers: headers,
+        body: body,
+      );
+
+  final data = jsonDecode(response.body);
+
+  if (response.statusCode == 200 && data['candidates'] != null) {
+    try {
+      final text = data['candidates'][0]['content']['parts'][0]['text']
+          .trim()
+          .toLowerCase();
+
+      switch (text) {
+        case 'present':
+          return EvidenceChoice.present;
+        case 'absent':
+          return EvidenceChoice.absent;
+        case 'unknown':
+          return EvidenceChoice.unknown;
+        default:
+          return null; // unexpected output
+      }
+    } catch (e) {
+      print('Error parsing response: $e\n${response.body}');
+      return null;
+    }
+  } else if (data['error'] != null) {
+    print('Error: ${data['error']['message']}');
+    return null;
+  } else {
+    print('Error: No candidates found\n${response.body}');
+    return null;
+  }
   }
 }
 
