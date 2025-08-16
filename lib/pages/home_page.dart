@@ -50,22 +50,6 @@ class _MyHomePageState extends State<MyHomePage> {
 
               SizedBox(height: 20),
 
-              // Search Bar
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: "Search",
-                    border: InputBorder.none,
-                    icon: Icon(Icons.search),
-                  ),
-                ),
-              ),
-
               SizedBox(height: 20),
 
               // Categories Title

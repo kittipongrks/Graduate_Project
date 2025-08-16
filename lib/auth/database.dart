@@ -17,6 +17,7 @@ class DatabaseService{
       'password': password,
     });
   }
+  
 }
 
 Future<dynamic> fetchUserInfo() async {
