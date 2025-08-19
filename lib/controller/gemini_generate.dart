@@ -22,43 +22,43 @@ final apiKey = dotenv.env['GEMINI_API_KEY'];
   };
 
 
-Future<String> callModelLLMs(String prompt) async {
-  prompt = '''[บทบาทของคุณ: คุณคือ AI ผู้ช่วยด้านสุขภาพที่เป็นมิตรและให้ข้อมูลเบื้องต้นอย่างระมัดระวัง] 
-[คำถามของผู้ใช้]:$prompt''';
+// Future<String> callModelLLMs(String prompt) async {
+//   prompt = '''[บทบาทของคุณ: คุณคือ AI ผู้ช่วยด้านสุขภาพที่เป็นมิตรและให้ข้อมูลเบื้องต้นอย่างระมัดระวัง] 
+// [คำถามของผู้ใช้]:$prompt''';
   
-  final body = jsonEncode({
-    "contents": [
-      {
-        "parts": [
-          {"text": prompt}
-        ]
-      }
-    ],
-    "generationConfig": {
-      "maxOutputTokens": 256,
-    },
-  });
-  final response = await http.post(
-    Uri.parse(endpoint),
-    headers: headers,
-    body: body,
-  );
-  final data = jsonDecode(response.body);
-  print('Gemini response: ${response.body}'); // Debug
+//   final body = jsonEncode({
+//     "contents": [
+//       {
+//         "parts": [
+//           {"text": prompt}
+//         ]
+//       }
+//     ],
+//     "generationConfig": {
+//       "maxOutputTokens": 256,
+//     },
+//   });
+//   final response = await http.post(
+//     Uri.parse(endpoint),
+//     headers: headers,
+//     body: body,
+//   );
+//   final data = jsonDecode(response.body);
+//   print('Gemini response: ${response.body}'); // Debug
 
-  if (response.statusCode == 200 && data['candidates'] != null) {
-    try {
-      final text = data['candidates'][0]['content']['parts'][0]['text'];
-      return text;
-    } catch (e) {
-      return 'เกิดข้อผิดพลาดในการแปลงข้อมูล: $e\n${response.body}';
-    }
-  } else if (data['error'] != null) {
-    return 'เกิดข้อผิดพลาด: ${data['error']['message']}';
-  } else {
-    return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${response.body}';
-  }
-}
+//   if (response.statusCode == 200 && data['candidates'] != null) {
+//     try {
+//       final text = data['candidates'][0]['content']['parts'][0]['text'];
+//       return text;
+//     } catch (e) {
+//       return 'เกิดข้อผิดพลาดในการแปลงข้อมูล: $e\n${response.body}';
+//     }
+//   } else if (data['error'] != null) {
+//     return 'เกิดข้อผิดพลาด: ${data['error']['message']}';
+//   } else {
+//     return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${response.body}';
+//   }
+// }
 
 
 
@@ -67,9 +67,20 @@ Future<String> callModelLLMs(String prompt) async {
 
 // Function to change English to Thai using LLMs
 Future<String> llmsChangeEngToThai(String prompt) async {
-  prompt = """ Translate the following English text into natural Thai that is easy for the general public to understand. 
-    Only output the translation without any additional details.
-    Text: $prompt""";
+  prompt = """ คุณเป็นนักแปลและผู้ช่วยสนทนาทางการแพทย์ ภารกิจของคุณคือแปลคำถามหรือคำศัพท์ทางการแพทย์จากภาษาอังกฤษเป็นภาษาไทยที่ฟังเป็นธรรมชาติ สำหรับผู้ใช้ทั่วไป  
+
+    กฎ:
+    1. อย่าแปลตรงตัวทีละคำ ให้ประโยคฟังเป็นธรรมชาติและเหมือนคนทั่วไปพูด
+    2. ใช้ภาษาง่าย ๆ ชัดเจน และเข้าใจง่ายสำหรับทุกคน
+    3. ถ้าคำศัพท์ทางการแพทย์ปรากฏ ให้ใส่คำอธิบายสั้น ๆ (1-2 คำ หรือในวงเล็บ)  
+    4. ทำให้ประโยคสั้น กระชับ และเป็นมิตร  
+
+    ตัวอย่าง:  
+    Input: "Are you photophobic?"
+    Output: "แสงจ้าแสบตาหรือเปล่า?"  
+
+    ตอนนี้ช่วยแปลและปรับประโยคนี้: $prompt
+    """;
 
   final body = jsonEncode({
     "contents": [
@@ -144,60 +155,108 @@ Future<String> llmsChangeThaiToEng(String prompt) async {
   }
 }
 
+Future <String> SummariseData(String prompt) async {
+  prompt = """ คุณเป็นนักแปลและผู้ช่วยอธิบายทางการแพทย์ ภารกิจของคุณคือแปลคำศัพท์ทางการแพทย์ให้ผู้ใช้ทั่วไปเข้าใจง่าย  
 
+    กฎ:
+    1. ใช้ภาษาง่าย ๆ ไม่ใช้ศัพท์ทางการแพทย์ยาก ๆ
+    2. อธิบายสั้น ๆ กระชับ (1-2 ประโยค)
+    3. ถ้าเป็นคำที่ซับซ้อน ให้ยกตัวอย่างหรือเปรียบเทียบสั้น ๆ
+    4. ทำให้ผู้ใช้ทั่วไปเข้าใจได้ทันที
 
+    ตัวอย่าง:
+    Input: "Hypertension"
+    Output: "ความดันโลหิตสูง คือหัวใจต้องทำงานหนักขึ้นเพื่อส่งเลือด"
 
+    ตอนนี้ช่วยแปลและอธิบายคำนี้: $prompt
+    
+    """;
 
-Future<String> translateChangeThaiToEng(String prompt) async {
-  final url = Uri.parse("http://10.0.2.2:5000/translate");
-
-  final response = await http.post(
-    url,
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: jsonEncode({
-      "q": "$prompt",
-      "source": "auto",
-      "target": "en",
-      "format": "text",
-      "alternatives": 3,
-    }),
+  final body = jsonEncode({
+    "contents": [
+      {
+        "parts": [
+          {"text": prompt}
+        ]
+      }
+    ],
+  });
+  final responseEngtoThai = await http.post(
+    Uri.parse(endpoint),
+    headers: headers,
+    body: body,
   );
+  final dataEngtoThai = jsonDecode(responseEngtoThai.body);
+  print(dataEngtoThai);
 
-  if (response.statusCode == 200) {
-    final data = jsonDecode(response.body);
-    print(data);
-    return data['translatedText'] ?? 'ไม่พบข้อความแปล';
+  if (responseEngtoThai.statusCode == 200 && dataEngtoThai['candidates'] != null) {
+    try {
+      final text = dataEngtoThai['candidates'][0]['content']['parts'][0]['text'];
+      return text;
+    } catch (e) {
+      return 'เกิดข้อผิดพลาดในการแปลงข้อมูล: $e\n${responseEngtoThai.body}';
+    }
+  } else if (dataEngtoThai['error'] != null) {
+    return 'เกิดข้อผิดพลาด: ${dataEngtoThai['error']['message']}';
   } else {
-    print("Error: ${response.statusCode}");
-    return 'เกิดข้อผิดพลาดในการแปล: ${response.statusCode}';
+    return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${responseEngtoThai.body}';
   }
 }
 
-Future<String> translateChangeEngToThai(String prompt) async {
-  final url = Uri.parse("http://10.0.2.2:5000/translate");
 
-  final response = await http.post(
-    url,
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: jsonEncode({
-      "q": "$prompt",
-      "source": "auto",
-      "target": "th",
-      "format": "text",
-      "alternatives": 3,
-    }),
-  );
 
-  if (response.statusCode == 200) {
-    final data = jsonDecode(response.body);
-    print(data);
-    return data['translatedText'] ?? 'ไม่พบข้อความแปล';
-  } else {
-    print("Error: ${response.statusCode}");
-    return 'เกิดข้อผิดพลาดในการแปล: ${response.statusCode}';
-  }
-}
+
+
+// Future<String> translateChangeThaiToEng(String prompt) async {
+//   final url = Uri.parse("http://10.0.2.2:5000/translate");
+
+//   final response = await http.post(
+//     url,
+//     headers: {
+//       "Content-Type": "application/json",
+//     },
+//     body: jsonEncode({
+//       "q": "$prompt",
+//       "source": "auto",
+//       "target": "en",
+//       "format": "text",
+//       "alternatives": 3,
+//     }),
+//   );
+
+//   if (response.statusCode == 200) {
+//     final data = jsonDecode(response.body);
+//     print(data);
+//     return data['translatedText'] ?? 'ไม่พบข้อความแปล';
+//   } else {
+//     print("Error: ${response.statusCode}");
+//     return 'เกิดข้อผิดพลาดในการแปล: ${response.statusCode}';
+//   }
+// }
+
+// Future<String> translateChangeEngToThai(String prompt) async {
+//   final url = Uri.parse("http://10.0.2.2:5000/translate");
+
+//   final response = await http.post(
+//     url,
+//     headers: {
+//       "Content-Type": "application/json",
+//     },
+//     body: jsonEncode({
+//       "q": "$prompt",
+//       "source": "auto",
+//       "target": "th",
+//       "format": "text",
+//       "alternatives": 3,
+//     }),
+//   );
+
+//   if (response.statusCode == 200) {
+//     final data = jsonDecode(response.body);
+//     print(data);
+//     return data['translatedText'] ?? 'ไม่พบข้อความแปล';
+//   } else {
+//     print("Error: ${response.statusCode}");
+//     return 'เกิดข้อผิดพลาดในการแปล: ${response.statusCode}';
+//   }
+// }

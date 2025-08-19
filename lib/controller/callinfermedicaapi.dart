@@ -36,12 +36,15 @@ class ChatMessage {
   final DateTime timestamp;
   final dynamic payload; // optional structured info (e.g., question, conditions)
 
+  final Widget? widget; 
+
   ChatMessage({
     required this.id,
     required this.sender,
     required this.text,
     DateTime? timestamp,
     this.payload,
+    this.widget,
   }) : timestamp = timestamp ?? DateTime.now();
 }
 
@@ -71,6 +74,7 @@ class EvidenceItem {
   }
 }
 
+
 // -----------------------------------------------------------------------------
 // INFERMEDICA SERVICE LAYER
 // -----------------------------------------------------------------------------
@@ -80,7 +84,7 @@ class InfermedicaService {
 
   Future<void> new_case_id() async {
     final uuid = Uuid();
-    final case_id = uuid.v4();
+    case_id = uuid.v4();
   }
   
   void resetPatient(){
@@ -97,7 +101,7 @@ class InfermedicaService {
         'App-Key': infermedicaAppKey,
 
         'Dev-Mode':'true',
-        'Interview-Id' : '123-456-789',
+        if (case_id != null) 'Interview-Id' : case_id!,
       };
 
   /// Call /parse to extract mentions (symptoms / risk factors) from user free text.
@@ -301,20 +305,18 @@ class InfermedicaChatController extends ChangeNotifier {
 
   final List<ChatMessage> _messages = [];
   final List<EvidenceItem> _evidence = [];
+
   bool _isBusy = false;
   DiagnosisResult? _lastDiagnosis;
+
+  int questionCount = 0;
 
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get isBusy => _isBusy;
   DiagnosisResult? get lastDiagnosis => _lastDiagnosis;
 
-  void addSystemMessage(String text , {dynamic payload}) {
-    _messages.add(ChatMessage(
-    id: const Uuid().v4(), 
-    sender: ChatSender.system, 
-    text: text,
-    payload: payload,
-    ));
+  void addSystemMessage(String text) {
+    _messages.add(ChatMessage(id: const Uuid().v4(), sender: ChatSender.system, text: text));
     notifyListeners();
   }
 
@@ -425,6 +427,29 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   Future<void> _runDiagnosisCycle() async {
+
+    if (questionCount >= 10) {
+    final summaryEn = _buildFinalSummaryText(_lastDiagnosis!);
+    final summaryTh = await SummariseData(summaryEn); //change to thai
+    // final summarywidget = Container(
+    //   padding: const EdgeInsets.all(12),
+    //   decoration: BoxDecoration(
+    //     color: Colors.blue.shade100,
+    //     borderRadius: BorderRadius.circular(12),
+    //   ),
+    //   child: Text(summaryEn),
+    // );
+    _messages.add(ChatMessage(
+      id: const Uuid().v4(),
+      sender: ChatSender.bot,
+      // widget: summarywidget,
+      text : summaryTh,
+      payload: {'diagnosis': _lastDiagnosis},
+    ));
+    notifyListeners();
+    return;
+  }
+
     _isBusy = true;
     notifyListeners();
     try {
@@ -439,7 +464,7 @@ class InfermedicaChatController extends ChangeNotifier {
       if (dx.isFinished) {
         // No more questions -> show conditions & triage.
         final summaryEn = _buildFinalSummaryText(dx);
-        // final summaryTh = await llmsChangeEngToThai(summaryEn); //change to thai
+        // final summaryTh = await SummariseData(summaryEn); //change to thai
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
@@ -457,6 +482,7 @@ class InfermedicaChatController extends ChangeNotifier {
           text: qTextTh,
           payload: {'question': dx.question},
         ));
+        questionCount++;
       }
       notifyListeners();
     } catch (e) {
@@ -468,6 +494,10 @@ class InfermedicaChatController extends ChangeNotifier {
       print(_isBusy);
     }
   }
+  
+
+  
+
 
   // ---------------------------------------------------------------------------
   // HELPER TEXT BUILDERS
@@ -506,6 +536,33 @@ class InfermedicaChatController extends ChangeNotifier {
     buf.writeln('\n(นี่คือการประเมินอัตโนมัติ ไม่ใช่วินิจฉัยจากแพทย์จริง)');
     return buf.toString().trim();
   }
+
+  Widget buildBubble(ChatMessage msg) {
+  if (msg.widget != null) {
+    // แสดง card แทนข้อความ
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: msg.widget!,
+    );
+  }
+  return Align(
+    alignment: msg.sender == ChatSender.user
+        ? Alignment.centerRight
+        : Alignment.centerLeft,
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: msg.sender == ChatSender.user
+            ? Colors.blue.shade100
+            : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(msg.text ?? ''),
+    ),
+  );
+}
+
 
   // ---------------------------------------------------------------------------
   // USER QUICK ANSWER MAPPING yes/no/maybe -> EvidenceChoice

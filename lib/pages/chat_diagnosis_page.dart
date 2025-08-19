@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:dahcpplication/auth/database.dart';
 import 'package:dahcpplication/controller/callinfermedicaapi.dart';
-import 'package:dahcpplication/pages/riskfactor_page.dart';
+import 'package:dahcpplication/pages/riskfactor_page.dart'; // สำหรับการถามคำถามผู้ใช้ก่อนเริ่มแชท ??
+import 'package:dahcpplication/pages/page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChatDiagnosisPage extends StatefulWidget {
   const ChatDiagnosisPage({super.key});
@@ -11,7 +13,7 @@ class ChatDiagnosisPage extends StatefulWidget {
 }
 
 class ChatDiagnosis extends State<ChatDiagnosisPage> {
-  double posXofDragButton = 320; 
+  double posXofDragButton = 300; 
   double posYofDragButton = 550;
   late final InfermedicaChatController _controller;
   final TextEditingController _textCtrl = TextEditingController();
@@ -25,7 +27,7 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
     _controller = InfermedicaChatController(service: InfermedicaService());
     _controller.addListener(_onControllerChanged);
     // Initial greeting
-    _controller.addSystemMessage('สวัสดี! คุณมีอาการอะบ้างพิมพ์ระบุมาได้เลยครับ' , payload: {'action': 'goto_risk_factors'});
+    _controller.addSystemMessage('สวัสดี! คุณมีอาการอะบ้างพิมพ์ระบุมาได้เลยครับ');
     loadUserInfo();
   }
 
@@ -86,7 +88,7 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
             children: [
-              _buildFunctionButton(Icons.chat, 'เริ่มแชท', () {
+              _buildFunctionButton(Icons.refresh, 'แชทใหม่', () {
                 Navigator.pop(context);
               }),
               _buildFunctionButton(Icons.history, 'ประวัติ', () {
@@ -94,22 +96,25 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
               }),
               _buildFunctionButton(Icons.location_pin, 'แผนที่', () {
                 Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const MyMapPage()),
+                );
               }),
               _buildFunctionButton(Icons.person, 'โปรไฟล์', () {
                 Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AccountPage()),
+                );
               }),
               _buildFunctionButton(Icons.settings, 'ตั้งค่า', () {
                 Navigator.pop(context);
               }),
               _buildFunctionButton(Icons.exit_to_app, 'ออกระบบ', (){
                 Navigator.pop(context);
+                _exitAlertDialog(context);
               }),
-              _buildFunctionButton(Icons.abc, 'test', (){
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const RiskFactorsPage()),
-                );
-              })
               
             ],
           ),
@@ -136,7 +141,7 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
             const SizedBox(height: 8),
             Text(
               label,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500 , color: Color.fromARGB(255, 0, 0, 0)),
             ),
           ],
         ),
@@ -169,7 +174,7 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
 
       body: SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(8),
         child: Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
@@ -290,11 +295,11 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
                   posXofDragButton += details.delta.dx;
                   posYofDragButton += details.delta.dy;
 
-                  final containerWidth = MediaQuery.of(context).size.width - 32; // padding 16x2
-                  final containerHeight = MediaQuery.of(context).size.height - 32;
+                  final containerWidth = MediaQuery.of(context).size.width - 16; // padding 16x2
+                  final containerHeight = MediaQuery.of(context).size.height - 16;
 
                   posXofDragButton = posXofDragButton.clamp(0.0, containerWidth - 50);
-                  posYofDragButton = posYofDragButton.clamp(0.0, containerHeight - 300);
+                  posYofDragButton = posYofDragButton.clamp(0.0, containerHeight - 200);
                 });
               },
               child: Container(
@@ -329,4 +334,30 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
 ),
     );
   }
+}
+
+void _exitAlertDialog(BuildContext context){
+  showDialog(context: context, builder: 
+  (BuildContext context){
+    return AlertDialog(
+      title: const Text('ออกจากระบบ' , style: TextStyle(fontSize: 20 , fontWeight: FontWeight.bold)),
+      content: const Text('ต้องการออกจากระบบหรือไม่?'),
+      actions: [
+        TextButton(
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+          child: const Text('ไม่'),
+        ),
+        TextButton(
+          onPressed: () async{
+            await FirebaseAuth.instance.signOut();
+            Navigator.of(context).pop();
+          },
+          child: const Text('ใช่'),
+        ),
+      ],
+    );
+  },
+  );
 }

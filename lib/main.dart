@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'DAHC application Flutter',
       debugShowCheckedModeBanner: false,
-      theme: lightThemeData(context),
+      theme: darkThemeData(context),
       darkTheme: darkThemeData(context),
       
       home: StreamBuilder(
@@ -37,7 +37,7 @@ class MyApp extends StatelessWidget {
             );
           }
           if (snapshot.data != null) {
-            return const NavigationMenu(); // should be NavigationMenu()
+            return const ChatDiagnosisPage(); // can be NavigationMenu()
           }
           return const LoginPage(); //should be LoginPage() but for development im gonna make it like first page 
         },

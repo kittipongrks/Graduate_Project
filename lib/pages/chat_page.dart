@@ -137,23 +137,25 @@ class _MyChatPageState extends State<MyChatPage> {
                               _messageController.clear();
                             });
 
-                            try {
-                              final geminiReply = await callModelLLMs(userMessage).timeout(
-                                const Duration(seconds: 10),
-                                onTimeout: () => 'เกิดข้อผิดพลาด: ใช้เวลาตอบนานเกินไป',
-                              );
-                              setState(() {
-                                _messages.add({'text': geminiReply, 'isMe': false});
-                              });
-                            } catch (e) {
-                              setState(() {
-                                _messages.add({'text': 'เกิดข้อผิดพลาด: $e', 'isMe': false});
-                              });
-                            } finally {
-                              setState(() {
-                                _isLoading = false;
-                              });
-                            }
+
+                            // สำหรับเรียกใช้ Gemini API 
+                            // try {
+                            //   final geminiReply = await callModelLLMs(userMessage).timeout(
+                            //     const Duration(seconds: 10),
+                            //     onTimeout: () => 'เกิดข้อผิดพลาด: ใช้เวลาตอบนานเกินไป',
+                            //   );
+                            //   setState(() {
+                            //     _messages.add({'text': geminiReply, 'isMe': false});
+                            //   });
+                            // } catch (e) {
+                            //   setState(() {
+                            //     _messages.add({'text': 'เกิดข้อผิดพลาด: $e', 'isMe': false});
+                            //   });
+                            // } finally {
+                            //   setState(() {
+                            //     _isLoading = false;
+                            //   });
+                            // }
                           }
                         },
                       ),

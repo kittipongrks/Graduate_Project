@@ -35,10 +35,14 @@ Future<dynamic> fetchUserInfo() async {
 
   final age = calculateAge(doc.data()?['birthdate'] ?? Timestamp.fromDate(DateTime(2000, 1, 1))); // Default is Age 25
   final gender = doc.data()?['gender'] ?? 'male';
+  final _foodAllergies = doc.data()?['foodAllergies'] ?? '';
+  final _medicalConditions = doc.data()?['medicalConditions'] ?? '';
   print("Current user info: $email, Age: $age");
   return {
     'age': age,
     'sex': gender,
+    'foodAllergies': _foodAllergies,
+    'medicalConditions': _medicalConditions,
   };
 }
 

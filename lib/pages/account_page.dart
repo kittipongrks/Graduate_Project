@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dahcpplication/auth/database.dart';
 
 
 void _exitAlertDialog(BuildContext context){
@@ -27,14 +29,89 @@ void _exitAlertDialog(BuildContext context){
   },
   );
 }
-class AccountPage extends StatelessWidget{
-  const AccountPage({super.key});
+
+class AccountPage extends StatefulWidget{
+  const AccountPage({Key? key}) : super(key: key);
+
+  @override
+  State<AccountPage> createState() => _AccountPageState();
+}
+
+class _AccountPageState extends State<AccountPage>{
+  final _auth = FirebaseAuth.instance;
+  final _firestore = FirebaseFirestore.instance;
+
+  final _ageController = TextEditingController();
+  final _genderController = TextEditingController();
+  final _foodAllergiesController = TextEditingController();
+  final _medicalConditionsController = TextEditingController();
+
+  @override
+  void dispose() {
+    _ageController.dispose();
+    _genderController.dispose();
+    _foodAllergiesController.dispose();
+    _medicalConditionsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+}
+
+
+ Future<void> _loadUserData() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        final doc = await _firestore.collection('users').doc(user.uid).get();
+        if (doc.exists) {
+          setState(() {
+            _ageController.text = doc['age'] ?? '';
+            _genderController.text = doc['gender'] ?? '';
+            _foodAllergiesController.text = doc['foodAllergies'] ?? '';
+            _medicalConditionsController.text = doc['medicalConditions'] ?? '';
+          });
+        }
+      }
+    } catch (e) {
+      print("Error loading user data: $e");
+      // Handle error appropriately (e.g., show a snackbar)
+    }
+  }
+
+//Function Calling
+ Future<void> _updateUserData() async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await _firestore.collection('users').doc(user.uid).update({
+          'age': _ageController.text,
+          'gender': _genderController.text,
+          'foodAllergies': _foodAllergiesController.text,
+          'medicalConditions': _medicalConditionsController.text,
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('บันทึกข้อมูลสำเร็จ')),
+        );
+      }
+    } catch (e) {
+      print("Error updating user data: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึกข้อมูล')),
+      );
+    }
+  }
+
+  
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('ข้อมูลส่วนตัว', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold ,)),
+        title: Text('โปรไฟล์', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold ,)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -98,10 +175,10 @@ class AccountPage extends StatelessWidget{
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: const TextField(
+                                child: TextFormField(
+                                  controller: _ageController,
                                   decoration: InputDecoration(
                                     border: InputBorder.none,
-                                    hintText: "Enter your age",
                                     hintStyle: TextStyle(color: Colors.black),
                                   ),
                                 ),
@@ -124,10 +201,10 @@ class AccountPage extends StatelessWidget{
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                                child: const TextField(
+                                child: TextFormField(
+                                  controller: _genderController,
                                   decoration: InputDecoration(
                                     border: InputBorder.none,
-                                    hintText: "Enter your gender",
                                     hintStyle: TextStyle(color: Colors.black),
                                   ),
                                 ),
@@ -153,10 +230,10 @@ class AccountPage extends StatelessWidget{
                             borderRadius: BorderRadius.circular(12),
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: const TextField(
+                          child: TextFormField(
+                            controller: _foodAllergiesController,
                             decoration: InputDecoration(
                               border: InputBorder.none,
-                              hintText: "Enter allergy info",
                               hintStyle: TextStyle(color: Colors.black),
                             ),
                           ),
@@ -179,16 +256,21 @@ class AccountPage extends StatelessWidget{
                             borderRadius: BorderRadius.circular(12),
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: const TextField(
+                          child: TextFormField(
+                            controller: _medicalConditionsController,
                             decoration: InputDecoration(
                               border: InputBorder.none,
-                              hintText: "Enter your health condition",
                               hintStyle: TextStyle(color: Colors.black),
                             ),
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 20),
+                     ElevatedButton(
+                        onPressed: _updateUserData,
+                        child: const Text('บันทึกข้อมูล'),
+                      ),
                   ],
                 ),
               ),
