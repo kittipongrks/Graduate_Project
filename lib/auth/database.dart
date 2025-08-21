@@ -5,9 +5,7 @@ class DatabaseService{
   DatabaseService({this.uid});
 
   final CollectionReference userCollection = 
-  FirebaseFirestore.instance.collection('users');
-  final CollectionReference gender = 
-  FirebaseFirestore.instance.collection('gender');
+  FirebaseFirestore.instance.collection('Users');
 
   Future updateUserData(
     String name, String email, String password) async {
@@ -30,7 +28,7 @@ Future<dynamic> fetchUserInfo() async {
 
   final doc = await FirebaseFirestore.instance
       .collection('Users')
-      .doc(email)
+      .doc(user.uid)
       .get();
 
   final age = calculateAge(doc.data()?['birthdate'] ?? Timestamp.fromDate(DateTime(2000, 1, 1))); // Default is Age 25

@@ -61,13 +61,16 @@ class _SignUpPageState extends State<SignUpPage> {
   // create user document and collent in firestore
   Future<void> createUserDocument(UserCredential? userCredential) async{
     if (userCredential != null && userCredential.user != null){
+      final uid = userCredential.user!.uid;
       await FirebaseFirestore.instance
           .collection('Users')
-          .doc(userCredential.user!.email)
+          .doc(uid)
           .set({
             'email': userCredential.user!.email,
             'birthdate': birthdate != null ? Timestamp.fromDate(birthdate!) : null,
             'gender' : genderController,
+            'foodAllergies': '',
+            'medicalConditions': '',
           });
     }
   }
