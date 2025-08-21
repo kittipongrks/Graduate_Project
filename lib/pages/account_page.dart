@@ -116,7 +116,7 @@ Future<dynamic> LoadUserInfo() async {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('โปรไฟล์', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold ,)),
+        title: Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),

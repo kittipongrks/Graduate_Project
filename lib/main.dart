@@ -25,7 +25,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'DAHC application Flutter',
       debugShowCheckedModeBanner: false,
-      theme: darkThemeData(context),
+      theme: lightThemeData(context),
       darkTheme: darkThemeData(context),
       
       home: StreamBuilder(

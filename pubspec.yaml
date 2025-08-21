@@ -92,6 +92,7 @@ flutter:
   assets:
   - assets/images/header_home_page.png
   - assets/images/Doctor_image_1per1.png
+  - assets/icon/icon.png
   - .env
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg

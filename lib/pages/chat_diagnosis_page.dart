@@ -13,13 +13,12 @@ class ChatDiagnosisPage extends StatefulWidget {
 }
 
 class ChatDiagnosis extends State<ChatDiagnosisPage> {
-  double posXofDragButton = 300; 
-  double posYofDragButton = 550;
   late final InfermedicaChatController _controller;
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   int age = defaultAge;
   String sex = defaultSex;
+  bool _hide = false; // สำหรับการเลื่อนขึ้นและหาย
 
   @override
   void initState() {
@@ -27,9 +26,10 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
     _controller = InfermedicaChatController(service: InfermedicaService());
     _controller.addListener(_onControllerChanged);
     // Initial greeting
-    _controller.addSystemMessage('สวัสดี! คุณมีอาการอะบ้างพิมพ์ระบุมาได้เลยครับ');
+    // _controller.addSystemMessage('สวัสดี! คุณมีอาการอะบ้างพิมพ์ระบุมาได้เลยครับ');
     loadUserInfo();
   }
+  
 
   Future<void> loadUserInfo() async {
     final document = await fetchUserInfo();
@@ -65,8 +65,13 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
   }
 
   Future<void> _sendCurrentText() async {
+    setState(() {
+      _hide = true; // Reset hide state when sending a new message
+    });
+    Future.delayed(Duration(milliseconds: 300), () {
+      _textCtrl.clear();
+      });
     final txt = _textCtrl.text;
-    _textCtrl.clear();
     await _controller.handleUserInput(txt);
   }
 
@@ -165,8 +170,16 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
               "Diagnosis",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
+            const Spacer(),
+            IconButton(
+              icon : Icon(Icons.grid_view_rounded),
+              onPressed: (){
+                _DraggableButton(context);
+              },)
           ],
+          
         ),
+        
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
       ),
@@ -174,15 +187,62 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
 
       body: SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(0),
         child: Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
+            color: Theme.of(context).colorScheme.inversePrimary,
           ),
           child: Stack(
             children: [
               // Chat messages
+              AnimatedSlide(
+                offset: _hide ? Offset(0, -1) : Offset(0, 0), // เลื่อนขึ้น
+                duration: Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                child: AnimatedOpacity(
+                  opacity: _hide ? 0 : 1, // จางหาย
+                  duration: Duration(milliseconds: 300),
+                  child: Container(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Hello, Text Me Anything...',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+
+                        const SizedBox(height: 30),
+
+                        // Robot Image
+                        const Image(
+                          image: AssetImage('assets/icon/icon.png'),
+                          height: 150,
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Subtitle
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 32),
+                          child: Text(
+                            'พิมพ์ข้อความยาวๆ หรือประโยคเพื่อเริ่มการสนทนา เพื่อวินิจัยอาการของคุณ',
+                            style: TextStyle(
+                              color: Color.fromARGB(255, 117, 117, 117),
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               Column(
                 children: [
                   Expanded(
@@ -236,6 +296,7 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
                             ),
                           ],
                         ),
+                        
                       ),
                     );
                   },
@@ -250,11 +311,17 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
+              color: Theme.of(context).colorScheme.inversePrimary,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               children: [
+                IconButton(
+                  icon: const Icon(Icons.keyboard_arrow_up_rounded, color: Colors.blue),
+                  onPressed: () {
+                    
+                  },
+                ),
                 Expanded(
                   child: TextField(
                     controller: _textCtrl, // ใช้ _textCtrl เหมือนเดิม
@@ -265,7 +332,7 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
                       filled: true,
                       fillColor: Theme.of(context).colorScheme.surface, // ใช้สีพื้นหลังของ Theme
                       border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(30),
                         borderSide: BorderSide.none,
                       ),
                       contentPadding: const EdgeInsets.all(12),
@@ -273,59 +340,63 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.send),
-                  color: Theme.of(context).colorScheme.primary,
-                  onPressed: _sendCurrentText, // ใช้ _sendCurrentText() เหมือนเดิม
-                ),
+                CircleAvatar(
+                    backgroundColor: Colors.blue,
+                    child: IconButton(
+                      icon: const Icon(Icons.send, color: Colors.white),
+                      onPressed: () {
+                        _sendCurrentText();
+                      },
+                    ),
+                  )
               ],
             ),
           ),
               ],
               ),
               
-          // ปุ่มที่ลากได้
+          // // ปุ่มที่ลากได้
           
-          Positioned(
-            left: posXofDragButton,
-            top: posYofDragButton,
-            child: GestureDetector(
-              onPanUpdate: (details) {
-                setState(() {
-                  posXofDragButton += details.delta.dx;
-                  posYofDragButton += details.delta.dy;
+          // Positioned(
+          //   left: posXofDragButton,
+          //   top: posYofDragButton,
+          //   child: GestureDetector(
+          //     onPanUpdate: (details) {
+          //       setState(() {
+          //         posXofDragButton += details.delta.dx;
+          //         posYofDragButton += details.delta.dy;
 
-                  final containerWidth = MediaQuery.of(context).size.width - 16; // padding 16x2
-                  final containerHeight = MediaQuery.of(context).size.height - 16;
+          //         final containerWidth = MediaQuery.of(context).size.width - 16; // padding 16x2
+          //         final containerHeight = MediaQuery.of(context).size.height - 16;
 
-                  posXofDragButton = posXofDragButton.clamp(0.0, containerWidth - 50);
-                  posYofDragButton = posYofDragButton.clamp(0.0, containerHeight - 200);
-                });
-              },
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
-                  borderRadius: BorderRadius.circular(32),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 5,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: IconButton(
-                  icon : Icon(Icons.add),
-                  onPressed: (){
-                    _DraggableButton(context);
-                  },
-                ),
-              ),
-            ),
-          ),
+          //         posXofDragButton = posXofDragButton.clamp(0.0, containerWidth - 50);
+          //         posYofDragButton = posYofDragButton.clamp(0.0, containerHeight - 200);
+          //       });
+          //     },
+          //     child: Container(
+          //       width: 50,
+          //       height: 50,
+          //       decoration: BoxDecoration(
+          //         color: Theme.of(context).colorScheme.primary,
+          //         borderRadius: BorderRadius.circular(32),
+          //         boxShadow: [
+          //           BoxShadow(
+          //             color: Colors.black26,
+          //             blurRadius: 5,
+          //             offset: Offset(0, 3),
+          //           ),
+          //         ],
+          //       ),
+          //       alignment: Alignment.center,
+          //       child: IconButton(
+          //         icon : Icon(Icons.add),
+          //         onPressed: (){
+          //           _DraggableButton(context);
+          //         },
+          //       ),
+          //     ),
+          //   ),
+          // ),
           
         ],
       ),

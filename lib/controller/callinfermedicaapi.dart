@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
@@ -33,20 +34,29 @@ class ChatMessage {
   final String id;
   final ChatSender sender;
   final String text;
-  final DateTime timestamp;
+  final Timestamp timestamp;
   final dynamic payload; // optional structured info (e.g., question, conditions)
 
-  final Widget? widget; 
 
   ChatMessage({
     required this.id,
     required this.sender,
     required this.text,
-    DateTime? timestamp,
+    Timestamp? timestamp,
     this.payload,
-    this.widget,
-  }) : timestamp = timestamp ?? DateTime.now();
+  }) : timestamp = timestamp ?? Timestamp.now();
+
+  //Maping Chatsender to String for display
+  Map<String , dynamic> toMap(){
+    return {
+      'senderID': id,
+      'sender': sender,
+      'message': text,
+      'timestamp': timestamp,
+    };
+  }
 }
+
 
 // Representation of evidence item for Infermedica
 class EvidenceItem {
@@ -160,6 +170,36 @@ class InfermedicaService {
     }
   }
 }
+
+Future<List<Map<String, dynamic>>> fetchSymptoms() async {
+  final uri = Uri.parse('$infermedicaBaseUrl/symptoms');
+  final response = await http.get(
+    uri,
+    headers: {
+      'Content-Type': 'application/json',
+      'App-Id': infermedicaAppId,
+      'App-Key': infermedicaAppKey,
+    },
+  );
+  if (response.statusCode == 200) {
+    final List<dynamic> data = jsonDecode(response.body);
+    return data.map((item) => {
+          "id": item["id"],
+          "name": item["name"],
+          "common_name": item["common_name"],
+        }).toList();
+  } else {
+    throw Exception("Failed to load symptoms: ${response.body}");
+  }
+}
+
+Future<Map<String, String>> loadSymptomMap() async {
+  final symptoms = await fetchSymptoms();
+  return {
+    for (var s in symptoms) s["id"]: s["common_name"],
+  };
+}
+
 
 class InfermedicaHttpException implements Exception {
   final int statusCode;
@@ -428,25 +468,26 @@ class InfermedicaChatController extends ChangeNotifier {
 
   Future<void> _runDiagnosisCycle() async {
 
-    if (questionCount >= 10) {
-    final summaryEn = _buildFinalSummaryText(_lastDiagnosis!);
-    final summaryTh = await SummariseData(summaryEn); //change to thai
-    // final summarywidget = Container(
-    //   padding: const EdgeInsets.all(12),
-    //   decoration: BoxDecoration(
-    //     color: Colors.blue.shade100,
-    //     borderRadius: BorderRadius.circular(12),
-    //   ),
-    //   child: Text(summaryEn),
-    // );
+    if (questionCount >= 2) {
+    final getevidenceText = await _buildFinalEvidenceText();
     _messages.add(ChatMessage(
       id: const Uuid().v4(),
       sender: ChatSender.bot,
       // widget: summarywidget,
-      text : summaryTh,
+      text : getevidenceText,
+      payload: {'diagnosis': _lastDiagnosis},
+    ));
+    final summaryEn = _buildFinalSummaryText(_lastDiagnosis!);
+    // final summaryTh = await SummariseData(summaryEn); //change to thai
+    _messages.add(ChatMessage(
+      id: const Uuid().v4(),
+      sender: ChatSender.bot,
+      // widget: summarywidget,
+      text : summaryEn,
       payload: {'diagnosis': _lastDiagnosis},
     ));
     notifyListeners();
+
     return;
   }
 
@@ -537,30 +578,25 @@ class InfermedicaChatController extends ChangeNotifier {
     return buf.toString().trim();
   }
 
-  Widget buildBubble(ChatMessage msg) {
-  if (msg.widget != null) {
-    // แสดง card แทนข้อความ
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: msg.widget!,
-    );
+  Future<String> _buildFinalEvidenceText() async{
+  final buf = StringBuffer();
+  final symptopMap = await loadSymptomMap();
+  buf.writeln('ข้อมูลอาการ/ปัจจัยเสี่ยงที่ใช้ในการประเมิน:');
+  if (_evidence.isEmpty) {
+    buf.writeln('- ไม่มีข้อมูลอาการ/ปัจจัยเสี่ยง');
+  } else {
+    for (final e in _evidence) {
+      if (e.choice == EvidenceChoice.absent) {
+        buf.writeln('- ${e.id}: -');
+      } else if (e.choice == EvidenceChoice.present) {
+        buf.writeln('- ${e.id}: +');
+      } else {
+        buf.writeln('- ${e.id}: ?');
+      }
+    }
   }
-  return Align(
-    alignment: msg.sender == ChatSender.user
-        ? Alignment.centerRight
-        : Alignment.centerLeft,
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: msg.sender == ChatSender.user
-            ? Colors.blue.shade100
-            : Colors.grey.shade200,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(msg.text ?? ''),
-    ),
-  );
+  buf.writeln('\n(นี่คือข้อมูลที่ใช้ในการประเมินอัตโนมัติ)');
+  return buf.toString().trim();
 }
 
 

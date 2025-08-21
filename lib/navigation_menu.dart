@@ -20,8 +20,8 @@ class _NavigationMenu extends State<NavigationMenu> {
   }
 
   final List<Widget> _pages = [
-    MyHomePage(),
     ChatDiagnosisPage(),
+    ChatStartScreen(),
     MyMapPage(),
     AccountPage(),
     
