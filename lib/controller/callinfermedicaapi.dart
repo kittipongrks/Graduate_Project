@@ -22,6 +22,7 @@ const String defaultSex = 'male'; // 'male' | 'female'
 
 
 
+
 // -----------------------------------------------------------------------------
 // CHAT MODELS
 // -----------------------------------------------------------------------------
@@ -64,7 +65,7 @@ class EvidenceItem {
   final EvidenceChoice choice;
   final String? source; // 'initial', 'user', 'question', etc.
 
-  EvidenceItem({required this.id, required this.choice, this.source});
+  EvidenceItem({required this.id, required this.choice ,this.source});
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -169,36 +170,36 @@ class InfermedicaService {
       throw InfermedicaHttpException(resp.statusCode, resp.body);
     }
   }
-}
 
-Future<List<Map<String, dynamic>>> fetchSymptoms() async {
-  final uri = Uri.parse('$infermedicaBaseUrl/symptoms');
-  final response = await http.get(
-    uri,
-    headers: {
-      'Content-Type': 'application/json',
-      'App-Id': infermedicaAppId,
-      'App-Key': infermedicaAppKey,
-    },
-  );
-  if (response.statusCode == 200) {
-    final List<dynamic> data = jsonDecode(response.body);
-    return data.map((item) => {
-          "id": item["id"],
-          "name": item["name"],
-          "common_name": item["common_name"],
-        }).toList();
-  } else {
-    throw Exception("Failed to load symptoms: ${response.body}");
+
+  Future<Map<String,dynamic>> explain({
+    required List<EvidenceItem> evidence,
+    required int age,
+    required String sex,
+    required String target,
+  }) async {
+    final uri = Uri.parse('$infermedicaBaseUrl/explain');
+    final body = utf8.encode(jsonEncode({
+      'age': { 'value': age , 'unit' : 'year'},
+      'sex': sex,
+      'evidence': evidence.map((e) => e.toJson()).toList(),
+      'target': target,
+    }));
+
+    final resp = await _client.post(uri, headers: _headers(), body: body);
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final Map<String, dynamic> data = jsonDecode(resp.body);
+      return {'supporting_evidence':data['supporting_evidence'] ?? [],
+              'conflicting_evidence':data['conflicting_evidence'] ?? [],
+              'unconfirmed_evidence': data['unconfirmed_evidence'] ?? [],
+      };
+    } else {
+      throw InfermedicaHttpException(resp.statusCode, resp.body);
+    }
   }
+
 }
 
-Future<Map<String, String>> loadSymptomMap() async {
-  final symptoms = await fetchSymptoms();
-  return {
-    for (var s in symptoms) s["id"]: s["common_name"],
-  };
-}
 
 
 class InfermedicaHttpException implements Exception {
@@ -346,6 +347,9 @@ class InfermedicaChatController extends ChangeNotifier {
   final List<ChatMessage> _messages = [];
   final List<EvidenceItem> _evidence = [];
 
+  
+  Map<String, dynamic> _evidence_common_name = {};
+
   bool _isBusy = false;
   DiagnosisResult? _lastDiagnosis;
 
@@ -468,29 +472,6 @@ class InfermedicaChatController extends ChangeNotifier {
 
   Future<void> _runDiagnosisCycle() async {
 
-    if (questionCount >= 2) {
-    final getevidenceText = await _buildFinalEvidenceText();
-    _messages.add(ChatMessage(
-      id: const Uuid().v4(),
-      sender: ChatSender.bot,
-      // widget: summarywidget,
-      text : getevidenceText,
-      payload: {'diagnosis': _lastDiagnosis},
-    ));
-    final summaryEn = _buildFinalSummaryText(_lastDiagnosis!);
-    // final summaryTh = await SummariseData(summaryEn); //change to thai
-    _messages.add(ChatMessage(
-      id: const Uuid().v4(),
-      sender: ChatSender.bot,
-      // widget: summarywidget,
-      text : summaryEn,
-      payload: {'diagnosis': _lastDiagnosis},
-    ));
-    notifyListeners();
-
-    return;
-  }
-
     _isBusy = true;
     notifyListeners();
     try {
@@ -502,17 +483,38 @@ class InfermedicaChatController extends ChangeNotifier {
       );
       _lastDiagnosis = dx;
 
-      if (dx.isFinished) {
-        // No more questions -> show conditions & triage.
+      if (dx.isFinished || questionCount >= 10) {
+        _evidence_common_name = await service.explain(
+          evidence: _evidence,
+          age: age,
+          sex: sex,
+          target: _lastDiagnosis?.conditions.first.id ?? '',);
+        print(_evidence_common_name);
+
+
+
+        final getevidenceText = await _buildFinalEvidenceText();
+        _messages.add(ChatMessage(
+          id: const Uuid().v4(),
+          sender: ChatSender.bot,
+          text : getevidenceText,
+        ));
+
+
+
+        // Show final diagnosis summary.
         final summaryEn = _buildFinalSummaryText(dx);
-        // final summaryTh = await SummariseData(summaryEn); //change to thai
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
           text: summaryEn,
           payload: {'diagnosis': dx},
         ));
-      } else {
+      } 
+      
+      
+      
+      else {
         // Show follow‑up question.
         final qTextEn = _buildQuestionDisplayText(dx.question!);
         final qTextTh = await llmsChangeEngToThai(qTextEn);
@@ -578,26 +580,35 @@ class InfermedicaChatController extends ChangeNotifier {
     return buf.toString().trim();
   }
 
-  Future<String> _buildFinalEvidenceText() async{
-  final buf = StringBuffer();
-  final symptopMap = await loadSymptomMap();
-  buf.writeln('ข้อมูลอาการ/ปัจจัยเสี่ยงที่ใช้ในการประเมิน:');
-  if (_evidence.isEmpty) {
-    buf.writeln('- ไม่มีข้อมูลอาการ/ปัจจัยเสี่ยง');
-  } else {
-    for (final e in _evidence) {
-      if (e.choice == EvidenceChoice.absent) {
-        buf.writeln('- ${e.id}: -');
-      } else if (e.choice == EvidenceChoice.present) {
-        buf.writeln('- ${e.id}: +');
-      } else {
-        buf.writeln('- ${e.id}: ?');
+  Future<String> _buildFinalEvidenceText() async {
+    final buf = StringBuffer();
+    buf.writeln('ข้อมูลอาการ:');
+
+    if (_evidence_common_name.isEmpty) {
+      buf.writeln('- ไม่มีข้อมูลอาการ/ปัจจัยเสี่ยง');
+    } else {
+      // loop แต่ละประเภท evidence
+      final Map<String, dynamic> evidences = _evidence_common_name;
+
+      // supporting = +
+      for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
+        buf.writeln('- ${e['common_name']}: +');
+      }
+
+      // conflicting = -
+      for (final e in List<Map<String, dynamic>>.from(evidences['conflicting_evidence'] ?? [])) {
+        buf.writeln('- ${e['common_name']}: -');
+      }
+
+      // unconfirmed = ?
+      for (final e in List<Map<String, dynamic>>.from(evidences['unconfirmed_evidence'] ?? [])) {
+        buf.writeln('- ${e['common_name']}: ?');
       }
     }
+
+    buf.writeln('\n(นี่คือข้อมูลที่ใช้ในการประเมินอัตโนมัติ)');
+    return buf.toString().trim();
   }
-  buf.writeln('\n(นี่คือข้อมูลที่ใช้ในการประเมินอัตโนมัติ)');
-  return buf.toString().trim();
-}
 
 
   // ---------------------------------------------------------------------------
