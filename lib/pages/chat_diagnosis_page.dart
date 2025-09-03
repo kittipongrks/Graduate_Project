@@ -1,9 +1,12 @@
+import 'package:dahcpplication/theme/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:dahcpplication/auth/database.dart';
 import 'package:dahcpplication/controller/callinfermedicaapi.dart';
 import 'package:dahcpplication/pages/riskfactor_page.dart'; // สำหรับการถามคำถามผู้ใช้ก่อนเริ่มแชท ??
 import 'package:dahcpplication/pages/page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:dahcpplication/controller/gemini_generate.dart';
 
 class ChatDiagnosisPage extends StatefulWidget {
   const ChatDiagnosisPage({super.key});
@@ -18,7 +21,6 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
   final ScrollController _scrollCtrl = ScrollController();
   int age = defaultAge;
   String sex = defaultSex;
-  bool _hide = false; // สำหรับการเลื่อนขึ้นและหาย
 
   @override
   void initState() {
@@ -26,7 +28,7 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
     _controller = InfermedicaChatController(service: InfermedicaService());
     _controller.addListener(_onControllerChanged);
     // Initial greeting
-    // _controller.addSystemMessage('สวัสดี! คุณมีอาการอะบ้างพิมพ์ระบุมาได้เลยครับ');
+     _controller.addSystemMessage('สวัสดี! ช่วยบอกเราเกี่ยวกับอาการทั้งหมดที่คุณกำลังเจอ แบบยาว ๆ หน่อยนะครับ \nจะได้ช่วยประเมินได้แม่นยำขึ้น');
     loadUserInfo();
   }
   
@@ -66,7 +68,6 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
 
   Future<void> _sendCurrentText() async {
     setState(() {
-      _hide = true; // Reset hide state when sending a new message
     });
     Future.delayed(Duration(milliseconds: 300), () {
       _textCtrl.clear();
@@ -77,13 +78,26 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
 
 
  void _DraggableButton(BuildContext context) {
+  final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
   showDialog(
     context: context,
     builder: (BuildContext context) {
       return AlertDialog(
-        title: const Text(
-          'ฟังก์ชันเพิ่มเติม',
-          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            const Text(
+              'ฟังก์ชันเพิ่มเติม',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const Spacer(),
+            IconButton(
+              onPressed: (){
+              themeProvider.toggleTheme();
+            }, 
+              icon: Icon(themeProvider.currentTheme == AppTheme.light 
+            ? Icons.light_mode
+            : Icons.dark_mode)),
+          ],
         ),
         content: SizedBox(
           width: double.maxFinite,
@@ -195,54 +209,7 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
           child: Stack(
             children: [
               // Chat messages
-              AnimatedSlide(
-                offset: _hide ? Offset(0, -1) : Offset(0, 0), // เลื่อนขึ้น
-                duration: Duration(milliseconds: 300),
-                curve: Curves.easeInOut,
-                child: AnimatedOpacity(
-                  opacity: _hide ? 0 : 1, // จางหาย
-                  duration: Duration(milliseconds: 300),
-                  child: Container(
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'Hello, Text Me Anything...',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
 
-                        const SizedBox(height: 30),
-
-                        // Robot Image
-                        const Image(
-                          image: AssetImage('assets/icon/icon.png'),
-                          height: 150,
-                        ),
-
-                        const SizedBox(height: 20),
-
-                        // Subtitle
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 32),
-                          child: Text(
-                            'พิมพ์ข้อความยาวๆ หรือประโยคเพื่อเริ่มการสนทนา เพื่อวินิจัยอาการของคุณ',
-                            style: TextStyle(
-                              color: Color.fromARGB(255, 117, 117, 117),
-                              fontSize: 14,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
               Column(
                 children: [
                   Expanded(

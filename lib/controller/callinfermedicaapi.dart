@@ -171,6 +171,29 @@ class InfermedicaService {
     }
   }
 
+  Future<DiagnosisTriage> triage({
+    required List<EvidenceItem> evidence,
+    required int age,
+    required String sex,
+  }) async {
+    final uri = Uri.parse('$infermedicaBaseUrl/triage');
+    final body = utf8.encode(jsonEncode({
+      'age': { 'value': age , 'unit' : 'year'},
+      'sex': sex,
+      'evidence': evidence.map((e) => e.toJson()).toList(),
+    }));
+    final resp = await _client.post(uri, headers: _headers(), body: body);
+    print(resp.body);
+
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final Map<String, dynamic> data = jsonDecode(resp.body);
+      return DiagnosisTriage.fromJson(data);
+    } else {
+      throw InfermedicaHttpException(resp.statusCode, resp.body);
+    }
+  }
+
 
   Future<Map<String,dynamic>> explain({
     required List<EvidenceItem> evidence,
@@ -294,13 +317,13 @@ class DiagnosisTriage {
   final String? recommendation;
   DiagnosisTriage({required this.level, this.recommendation});
   factory DiagnosisTriage.fromJson(Map<String, dynamic> json) => DiagnosisTriage(
-        level: json['level'] as String? ?? 'unknown',
+        level: json['triage_level'] as String? ?? 'unknown',
         recommendation: json['recommendation'] as String?,
       );
 }
 
 class DiagnosisResult {
-  final DiagnosisQuestion? question; // null when finished
+  final DiagnosisQuestion? question;
   final List<DiagnosisCondition> conditions;
   final DiagnosisTriage? triage;
 
@@ -360,9 +383,14 @@ class InfermedicaChatController extends ChangeNotifier {
   DiagnosisResult? get lastDiagnosis => _lastDiagnosis;
 
   void addSystemMessage(String text) {
+  bool _isLoading = true;
+  notifyListeners();
+  Future.delayed(Duration(seconds: 1), () { 
     _messages.add(ChatMessage(id: const Uuid().v4(), sender: ChatSender.system, text: text));
+    _isLoading = false; // Hide loading indicator after delay
     notifyListeners();
-  }
+  });
+}
 
   void addErrorMessage(String text) {
     _messages.add(ChatMessage(id: const Uuid().v4(), sender: ChatSender.error, text: text));
@@ -384,8 +412,12 @@ class InfermedicaChatController extends ChangeNotifier {
     _messages.add(ChatMessage(id: const Uuid().v4(), sender: ChatSender.user, text: rawUserText));
     notifyListeners();
 
+    callParse(rawUserText);
     // If we are currently answering a follow‑up question expecting yes/no/maybe,
     // try to map quick answer directly to evidence for that pending question.
+  }
+
+  void callParse(String rawUserText) async{
     if (_lastDiagnosis?.question != null) {
       final q = _lastDiagnosis!.question!;
       final EvidenceChoice? mapped = await _mapUserQuickAnswer(rawUserText);
@@ -471,7 +503,6 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   Future<void> _runDiagnosisCycle() async {
-
     _isBusy = true;
     notifyListeners();
     try {
@@ -483,15 +514,27 @@ class InfermedicaChatController extends ChangeNotifier {
       );
       _lastDiagnosis = dx;
 
-      if (dx.isFinished || questionCount >= 10) {
+      if (dx.isFinished || questionCount >= 1) {
+        final tx = await service.triage(
+          evidence: _evidence, 
+          age: age, 
+          sex: sex
+        );
+        // ใส่ค่า triage ลงไปใน DiagnosisResult
+        final updatedDx = DiagnosisResult(
+          question: dx.question,
+          conditions: dx.conditions,
+          triage: tx,
+        );
+        _lastDiagnosis = updatedDx;
+        
+
         _evidence_common_name = await service.explain(
           evidence: _evidence,
           age: age,
           sex: sex,
           target: _lastDiagnosis?.conditions.first.id ?? '',);
         print(_evidence_common_name);
-
-
 
         final getevidenceText = await _buildFinalEvidenceText();
         _messages.add(ChatMessage(
@@ -500,15 +543,13 @@ class InfermedicaChatController extends ChangeNotifier {
           text : getevidenceText,
         ));
 
-
-
         // Show final diagnosis summary.
-        final summaryEn = _buildFinalSummaryText(dx);
+        final summaryEn = _buildFinalSummaryText(updatedDx);
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
-          text: summaryEn,
-          payload: {'diagnosis': dx},
+          text: await summaryEn,
+          payload: {'diagnosis': updatedDx},
         ));
       } 
       
@@ -538,6 +579,9 @@ class InfermedicaChatController extends ChangeNotifier {
     }
   }
   
+  Future<void> _calltriage() async {
+
+  }
 
   
 
@@ -559,25 +603,13 @@ class InfermedicaChatController extends ChangeNotifier {
     return buf.toString().trim();
   }
 
-  String _buildFinalSummaryText(DiagnosisResult dx) {
-    final buf = StringBuffer();
-    buf.writeln('สรุปผลเบื้องต้น:');
-    if (dx.conditions.isEmpty) {
-      buf.writeln('- ไม่พบโรคที่เป็นไปได้ (ข้อมูลไม่เพียงพอ)');
-    } else {
-      for (final c in dx.conditions.take(5)) {
-        final pct = (c.probability * 100).toStringAsFixed(1);
-        buf.writeln('- ${c.name}: ~${pct}%');
-      }
+  Future<List<String>> collect_conditions_name(DiagnosisResult dx)async{
+    List <String> c_thai_List = [];
+    for (final i in dx.conditions.take(5)){
+      String c_thai = await Terminology_medical_translate(i.name);
+      c_thai_List.add(c_thai);
     }
-    if (dx.triage != null) {
-      buf.writeln('\nระดับคำแนะนำ: ${dx.triage!.level}');
-      if (dx.triage!.recommendation != null) {
-        buf.writeln(dx.triage!.recommendation!);
-      }
-    }
-    buf.writeln('\n(นี่คือการประเมินอัตโนมัติ ไม่ใช่วินิจฉัยจากแพทย์จริง)');
-    return buf.toString().trim();
+    return c_thai_List ;
   }
 
   Future<String> _buildFinalEvidenceText() async {
@@ -607,6 +639,56 @@ class InfermedicaChatController extends ChangeNotifier {
     }
 
     buf.writeln('\n(นี่คือข้อมูลที่ใช้ในการประเมินอัตโนมัติ)');
+    return buf.toString().trim();
+  }
+
+  Future<String> _buildFinalSummaryText(DiagnosisResult dx) async{
+    final buf = StringBuffer();
+    buf.writeln('สรุปผลเบื้องต้น:');
+    buf.writeln('มีโอกาสเป็น:');
+    if (dx.conditions.isEmpty) {
+      buf.writeln('- ไม่พบโรคที่เป็นไปได้ (ข้อมูลไม่เพียงพอ)');
+    } else {
+      final c_thai_list = await collect_conditions_name(dx);
+
+        // Loop through both lists simultaneously using an index
+        for (int i = 0; i < dx.conditions.take(5).length; i++) {
+          final c = dx.conditions[i];
+          final c_thai = c_thai_list[i];
+          final pct = (c.probability * 100).toStringAsFixed(1);
+          
+          buf.writeln('\n- ${c.name}: ${c_thai} ประมาณ:${pct}%');
+        }
+      
+    }
+    if (dx.triage != null) {
+      buf.writeln('\nระดับคำแนะนำ: ${dx.triage!.level}');
+      if (dx.triage!.recommendation != null) {
+        buf.writeln(dx.triage!.recommendation!);
+      }
+    }
+    buf.writeln('\n(นี่คือการประเมินอัตโนมัติ ไม่ใช่วินิจฉัยจากแพทย์จริง)');
+    return buf.toString().trim();
+  }
+
+  Future<String> _buildFinalSelfCare(DiagnosisResult dx) async{
+    if(dx.triage!= null){
+      switch(dx.triage){
+        case "self_care":
+            
+          break;
+        case "consultions":
+
+          break;
+        case "emergency":
+
+          break;
+        default:
+
+          break;
+      }
+    }
+    final buf = StringBuffer();
     return buf.toString().trim();
   }
 
