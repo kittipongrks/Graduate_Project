@@ -19,7 +19,8 @@ final infermedicaAppKey = dotenv.env['INFERMEDICA_APP_KEY'] ?? '';
 // อายุ/เพศของผู้ใช้ (ในระบบจริงคุณดึงจากโปรไฟล์หรือให้ user กรอก)
 const int defaultAge = 30; // ตัวอย่าง
 const String defaultSex = 'male'; // 'male' | 'female'
-
+const String defaultAllergies = '';
+const String defaultMedicalConditions = '';
 
 
 
@@ -363,9 +364,22 @@ class InfermedicaChatController extends ChangeNotifier {
         caseId = caseId ?? const Uuid().v4();
 
   final InfermedicaService service;
-  final int age;
-  final String sex;
+  final documentUser = fetchUserInfo();
+  int age ;
+  String sex;
   final String caseId;
+
+  Future<void> loadUserData() async {
+    final db = DatabaseService();
+    final userProfile = await fetchUserInfo();
+
+    age = userProfile['age'] ?? defaultAge;
+    sex = userProfile['sex'] ?? defaultSex;
+    print(age);
+    print(sex);
+
+    notifyListeners();
+  }
 
   final List<ChatMessage> _messages = [];
   final List<EvidenceItem> _evidence = [];
@@ -551,6 +565,14 @@ class InfermedicaChatController extends ChangeNotifier {
           text: await summaryEn,
           payload: {'diagnosis': updatedDx},
         ));
+
+        final selfcare = _buildFinalTriage(updatedDx);
+        _messages.add(ChatMessage(
+          id: const Uuid().v4(), 
+          sender: ChatSender.bot,
+          text: await selfcare,
+          payload: {'diagnosis': updatedDx},
+        ));
       } 
       
       
@@ -579,9 +601,6 @@ class InfermedicaChatController extends ChangeNotifier {
     }
   }
   
-  Future<void> _calltriage() async {
-
-  }
 
   
 
@@ -657,7 +676,7 @@ class InfermedicaChatController extends ChangeNotifier {
           final c_thai = c_thai_list[i];
           final pct = (c.probability * 100).toStringAsFixed(1);
           
-          buf.writeln('\n- ${c.name}: ${c_thai} ประมาณ:${pct}%');
+          buf.writeln('\n- ${c.name}: ${c_thai} ประมาณ: ${pct}%');
         }
       
     }
@@ -671,24 +690,24 @@ class InfermedicaChatController extends ChangeNotifier {
     return buf.toString().trim();
   }
 
-  Future<String> _buildFinalSelfCare(DiagnosisResult dx) async{
-    if(dx.triage!= null){
-      switch(dx.triage){
+  Future<String> _buildFinalTriage(DiagnosisResult dx) async{
+    final buf = StringBuffer();
+    if(dx.triage != null){
+      switch(dx.triage!.level.trim()){
         case "self_care":
-            
+            buf.write("self_care");
           break;
-        case "consultions":
-
+        case "consultations":
+            buf.write("consultations");
           break;
         case "emergency":
-
+            buf.write("emergency");           
           break;
         default:
-
+          buf.write("do not have triage");
           break;
       }
     }
-    final buf = StringBuffer();
     return buf.toString().trim();
   }
 

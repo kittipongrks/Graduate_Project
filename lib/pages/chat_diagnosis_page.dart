@@ -19,28 +19,51 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
   late final InfermedicaChatController _controller;
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
-  int age = defaultAge;
-  String sex = defaultSex;
+  int? age;
+  String? sex;
+  String? foodAllergies;
+  String? medicalConditions;
+
+  bool _showSuggestionButtons = false;
+
+  bool _isDataLoaded = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = InfermedicaChatController(service: InfermedicaService());
-    _controller.addListener(_onControllerChanged);
-    // Initial greeting
-     _controller.addSystemMessage('สวัสดี! ช่วยบอกเราเกี่ยวกับอาการทั้งหมดที่คุณกำลังเจอ แบบยาว ๆ หน่อยนะครับ \nจะได้ช่วยประเมินได้แม่นยำขึ้น');
     loadUserInfo();
-  }
+    }
   
 
   Future<void> loadUserInfo() async {
+    print("try to load userinfo");
     final document = await fetchUserInfo();
     if (document != null) {
-      setState(() {
-        age = document['age'];
-        sex = document['sex'];
-      });
+      age = document['age'];
+      sex = document['sex'];
+      foodAllergies = document['foodAllergies'];
+      medicalConditions = document['medicalConditions'];
+      print("load UserInfo success and get those stuff $age , $sex , $foodAllergies , $medicalConditions");
+    } else {
+      print("No user data found, using default values.");
+      // ถ้าไม่มีข้อมูลใน Firebase จะใช้ค่าเริ่มต้น
+      age = defaultAge;
+      sex = defaultSex;
     }
+    
+    // สร้าง Controller หลังจากที่ age และ sex ถูกกำหนดค่าแล้ว
+    _controller = InfermedicaChatController(
+      service: InfermedicaService(),
+      age: age,
+      sex: sex,
+    );
+    _controller.addListener(_onControllerChanged);
+    _controller.addSystemMessage('สวัสดี! ช่วยบอกเราเกี่ยวกับอาการทั้งหมดที่คุณกำลังเจอ แบบยาว ๆ หน่อยนะครับ \nจะได้ช่วยประเมินได้แม่นยำขึ้น');
+
+    // อัปเดตสถานะเพื่อแสดง UI หลัก
+    setState(() {
+      _isDataLoaded = true;
+    });
   }
 
   @override
@@ -65,10 +88,11 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
       }
     });
   }
+  Future<void> _sendQuickresponse()async{
+
+  }
 
   Future<void> _sendCurrentText() async {
-    setState(() {
-    });
     Future.delayed(Duration(milliseconds: 300), () {
       _textCtrl.clear();
       });
@@ -90,13 +114,13 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const Spacer(),
-            IconButton(
-              onPressed: (){
-              themeProvider.toggleTheme();
-            }, 
-              icon: Icon(themeProvider.currentTheme == AppTheme.light 
-            ? Icons.light_mode
-            : Icons.dark_mode)),
+            // IconButton(
+            //   onPressed: (){
+            //   themeProvider.toggleTheme();
+            // }, 
+            //   icon: Icon(themeProvider.currentTheme == AppTheme.light 
+            // ? Icons.light_mode
+            // : Icons.dark_mode)),
           ],
         ),
         content: SizedBox(
@@ -220,12 +244,24 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
                   itemBuilder: (context, i) {
                     final m = msgs[i]; // ใช้ m = msgs[i] เหมือนเดิม
                     final isMe = m.sender == ChatSender.user; // กำหนด isMe จาก m.sender
-                    final color = switch (m.sender) { // ใช้ color switch เหมือนเดิม
-                      ChatSender.user => Colors.green.shade100, // เปลี่ยนสีตามตัวอย่าง
-                      ChatSender.bot => Colors.blue.shade100, // เปลี่ยนสีตามตัวอย่าง
-                      ChatSender.system => Colors.blue.shade100,
-                      ChatSender.error => Colors.red.shade200,
-                    };
+                    final color = switch (m.sender) {
+                    ChatSender.user => [
+                    const Color(0xFF50A4E4),
+                    const Color(0xFF7F95DB),
+                    ], // User message: Purple-blue gradient
+                    ChatSender.bot => [
+                      Colors.grey[200]!,
+                      Colors.grey[200]!
+                    ], // Bot message: Light grey solid color (you can use a gradient here too)
+                    ChatSender.system => [
+                      Colors.grey[200]!,
+                      Colors.grey[200]!
+                    ], // System message: Yellow solid color
+                    ChatSender.error => [
+                      Colors.red[400]!,
+                      Colors.red[600]!
+                    ], // Error message: Red gradient
+                  };
 
                     return Align(
                       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -248,12 +284,16 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
                               constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: color,
+                                gradient: LinearGradient(
+                                    colors: color,
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
                                 borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(15),
-                                  topRight: const Radius.circular(15),
-                                  bottomLeft: isMe ? const Radius.circular(15) : Radius.zero,
-                                  bottomRight: isMe ? Radius.zero : const Radius.circular(15),
+                                  topLeft: const Radius.circular(20),
+                                  topRight: const Radius.circular(20),
+                                  bottomLeft: isMe ? const Radius.circular(20) : Radius.circular(10),
+                                  bottomRight: isMe ? Radius.circular(10) : const Radius.circular(20),
                                 ),
                               ),
                               child: Text(
@@ -274,7 +314,32 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
                 padding: EdgeInsets.all(8.0),
                 child: CircularProgressIndicator(),
               ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end, // เพิ่มบรรทัดนี้
+                  children: [
+                    _buildTextButton('ใช่', () {
+                      _textCtrl.text = "ใช่";   // ใส่ค่าลงใน TextField controller
+                      _sendCurrentText();
+                    }),
+                    const SizedBox(width: 8),
+                    _buildTextButton('ไม่ใช่', () {
+                      _textCtrl.text = "ไม่ใช่";   // ใส่ค่าลงใน TextField controller
+                      _sendCurrentText();
+                    }),
+                    const SizedBox(width: 8),
+                    _buildTextButton('อาจจะ', () {
+                      _textCtrl.text = "อาจจะ";   // ใส่ค่าลงใน TextField controller
+                      _sendCurrentText();
+                    }),
+                    // สามารถเพิ่มปุ่มอื่นๆ ที่นี่ได้
+                  ],
+                ),
+              ),
               // Input box
+
+
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             decoration: BoxDecoration(
@@ -307,15 +372,25 @@ class ChatDiagnosis extends State<ChatDiagnosisPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                CircleAvatar(
-                    backgroundColor: Colors.blue,
+                ClipOval(
+                  child: Container(
+                    width: 48, // กำหนดขนาดที่เหมาะสม
+                    height: 48, // กำหนดขนาดที่เหมาะสม
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [ Color(0xFF50A4E4), Color(0xFF7F95DB),],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
                     child: IconButton(
                       icon: const Icon(Icons.send, color: Colors.white),
                       onPressed: () {
                         _sendCurrentText();
                       },
                     ),
-                  )
+                  ),
+                )
               ],
             ),
           ),
@@ -397,5 +472,21 @@ void _exitAlertDialog(BuildContext context){
       ],
     );
   },
+  );
+}
+
+Widget _buildTextButton(String text, VoidCallback onPressed) {
+  return TextButton(
+    onPressed: onPressed,
+    style: TextButton.styleFrom(
+      foregroundColor: Colors.blue, // สีข้อความ
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      backgroundColor: Colors.blue.withOpacity(0.1), // สีพื้นหลังจางๆ
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: Colors.blue), // เส้นขอบ
+      ),
+    ),
+    child: Text(text),
   );
 }

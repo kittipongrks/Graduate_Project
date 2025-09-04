@@ -1,8 +1,6 @@
 import 'dart:convert';
-import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:dahcpplication/controller/callinfermedicaapi.dart';
 
 final Map<String , dynamic> models = {
   'gemini-2.0-flash-lite':{
@@ -169,6 +167,41 @@ Future<String> Terminology_medical_translate(String prompt) async{
   เช่น Tension-type headache แปลเป็น ปวดศีรษะจากความเครียด
   ให้เอาเฉพาะภาษาไทยที่แปลออกมาเท่านั้น ไม่เอาภาษาอังกฤษหรือคำอธิบายอื่นๆ 
     
+    """;
+
+  final body = jsonEncode({
+    "contents": [
+      {
+        "parts": [
+          {"text": prompt}
+        ]
+      }
+    ],
+  });
+  final responseEngtoThai = await http.post(
+    Uri.parse(endpoint),
+    headers: headers,
+    body: body,
+  );
+  final dataEngtoThai = jsonDecode(responseEngtoThai.body);
+  print(dataEngtoThai);
+
+  if (responseEngtoThai.statusCode == 200 && dataEngtoThai['candidates'] != null) {
+    try {
+      final text = dataEngtoThai['candidates'][0]['content']['parts'][0]['text'];
+      return text;
+    } catch (e) {
+      return 'เกิดข้อผิดพลาดในการแปลงข้อมูล: $e\n${responseEngtoThai.body}';
+    }
+  } else if (dataEngtoThai['error'] != null) {
+    return 'เกิดข้อผิดพลาด: ${dataEngtoThai['error']['message']}';
+  } else {
+    return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${responseEngtoThai.body}';
+  }
+}
+
+Future<String> self_care_suggestion(String prompt,int age, String gender)async{
+  prompt = """
     """;
 
   final body = jsonEncode({

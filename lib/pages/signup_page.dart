@@ -211,8 +211,8 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'Male', child: Text('Male')),
-                  DropdownMenuItem(value: 'Female', child: Text('Female')),
+                  DropdownMenuItem(value: 'male', child: Text('Male')),
+                  DropdownMenuItem(value: 'female', child: Text('Female')),
                 ],
                 onChanged: (value) {
                   setState(() {
