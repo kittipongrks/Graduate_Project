@@ -32,10 +32,14 @@ enum ChatSender { user, bot, system, error }
 
 enum EvidenceChoice { present, absent, unknown }
 
+enum MessageType { text, card, chart }
+
 class ChatMessage {
   final String id;
+  final MessageType type ;
   final ChatSender sender;
-  final String text;
+  final String? text;
+  final Map<String, dynamic>? textreuslt;
   final Timestamp timestamp;
   final dynamic payload; // optional structured info (e.g., question, conditions)
 
@@ -43,7 +47,9 @@ class ChatMessage {
   ChatMessage({
     required this.id,
     required this.sender,
-    required this.text,
+    required this.type,
+    this.text,
+    this.textreuslt,
     Timestamp? timestamp,
     this.payload,
   }) : timestamp = timestamp ?? Timestamp.now();
@@ -53,7 +59,10 @@ class ChatMessage {
     return {
       'senderID': id,
       'sender': sender,
-      'message': text,
+      'type': type.name,
+      'text': text,
+      'textreuslt': textreuslt,
+      'payload' : payload,
       'timestamp': timestamp,
     };
   }
@@ -359,22 +368,29 @@ class InfermedicaChatController extends ChangeNotifier {
     int? age,
     String? sex,
     String? caseId,
+    String? foodAllergies,
+    String? medicalConditions,
   })  : age = age ?? defaultAge,
         sex = sex ?? defaultSex,
+        foodAllergies = foodAllergies ?? defaultAllergies,
+        medicalConditions = medicalConditions ?? defaultMedicalConditions,
         caseId = caseId ?? const Uuid().v4();
+        
 
   final InfermedicaService service;
-  final documentUser = fetchUserInfo();
   int age ;
   String sex;
+  String foodAllergies;
+  String medicalConditions;
   final String caseId;
 
   Future<void> loadUserData() async {
-    final db = DatabaseService();
     final userProfile = await fetchUserInfo();
 
     age = userProfile['age'] ?? defaultAge;
     sex = userProfile['sex'] ?? defaultSex;
+    foodAllergies = userProfile['foodAllergies'] ?? defaultAllergies;
+    medicalConditions = userProfile['medicalConditions'] ?? defaultMedicalConditions;
     print(age);
     print(sex);
 
@@ -400,14 +416,23 @@ class InfermedicaChatController extends ChangeNotifier {
   bool _isLoading = true;
   notifyListeners();
   Future.delayed(Duration(seconds: 1), () { 
-    _messages.add(ChatMessage(id: const Uuid().v4(), sender: ChatSender.system, text: text));
+    _messages.add(ChatMessage(
+      id: const Uuid().v4(), 
+      sender: ChatSender.system,
+      type: MessageType.text,
+      text: text
+      ));
     _isLoading = false; // Hide loading indicator after delay
     notifyListeners();
   });
 }
 
   void addErrorMessage(String text) {
-    _messages.add(ChatMessage(id: const Uuid().v4(), sender: ChatSender.error, text: text));
+    _messages.add(ChatMessage(
+      id: const Uuid().v4(), 
+      sender: ChatSender.error, 
+      type: MessageType.text,
+      text: text));
     notifyListeners();
   }
 
@@ -423,7 +448,11 @@ class InfermedicaChatController extends ChangeNotifier {
     if (rawUserText.trim().isEmpty) return;
 
     // Show user message in chat.
-    _messages.add(ChatMessage(id: const Uuid().v4(), sender: ChatSender.user, text: rawUserText));
+    _messages.add(ChatMessage(
+      id: const Uuid().v4(), 
+      sender: ChatSender.user, 
+      type: MessageType.text,
+      text: rawUserText));
     notifyListeners();
 
     callParse(rawUserText);
@@ -497,6 +526,7 @@ class InfermedicaChatController extends ChangeNotifier {
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
+          type: MessageType.text,
           text: "ฉันไม่พบอาการจากข้อความนั้น คุณช่วยอธิบายเพิ่มเติมได้ไหม?", // Thai
           payload: {'type': 'no_mentions'},
         ));
@@ -554,22 +584,27 @@ class InfermedicaChatController extends ChangeNotifier {
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
+          type: MessageType.text,
           text : getevidenceText,
         ));
 
         // Show final diagnosis summary.
         final summaryEn = _buildFinalSummaryText(updatedDx);
+        final data = await _MaptoCardForSummary(updatedDx);
+        
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
+          type: MessageType.text,
           text: await summaryEn,
           payload: {'diagnosis': updatedDx},
         ));
 
-        final selfcare = _buildFinalTriage(updatedDx);
+        final selfcare = _buildFinalSuggest(updatedDx);
         _messages.add(ChatMessage(
           id: const Uuid().v4(), 
           sender: ChatSender.bot,
+          type: MessageType.card,
           text: await selfcare,
           payload: {'diagnosis': updatedDx},
         ));
@@ -585,6 +620,7 @@ class InfermedicaChatController extends ChangeNotifier {
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
+          type: MessageType.text,
           text: qTextTh,
           payload: {'question': dx.question},
         ));
@@ -661,6 +697,20 @@ class InfermedicaChatController extends ChangeNotifier {
     return buf.toString().trim();
   }
 
+  Future<Map<String, dynamic >> _MaptoCardForSummary (DiagnosisResult dx) async{
+    return {
+      'conditions': dx.conditions.map((c) => {
+        'id': c.id,
+        'name': c.name,
+        'probability': c.probability,
+      }).toList(),
+      'triage': dx.triage != null ? {
+        'level': dx.triage!.level,
+        'recommendation': dx.triage!.recommendation,
+      } : null,
+    };
+  }
+
   Future<String> _buildFinalSummaryText(DiagnosisResult dx) async{
     final buf = StringBuffer();
     buf.writeln('สรุปผลเบื้องต้น:');
@@ -690,18 +740,60 @@ class InfermedicaChatController extends ChangeNotifier {
     return buf.toString().trim();
   }
 
-  Future<String> _buildFinalTriage(DiagnosisResult dx) async{
+  Future<String> _buildFinalSuggest(DiagnosisResult dx) async{
     final buf = StringBuffer();
     if(dx.triage != null){
       switch(dx.triage!.level.trim()){
         case "self_care":
-            buf.write("self_care");
+          final Map<String, dynamic> evidences = _evidence_common_name;
+          String symptom = '';
+          for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
+            symptom = symptom + e['common_name'] ;
+            if (e['common_name'].isNotEmpty) {
+              symptom += ', ';
+            }
+            
+          }
+            buf.write("self_care\n");
+            buf.write("test age: $age , sex: $sex \nมีอาการดังนี้: $symptom \nซึ่งมีสิ่งที่ต้องระวัง: \nแพ้ยา:$medicalConditions, \nแพ้อาหาร: $foodAllergies,");
           break;
-        case "consultations":
-            buf.write("consultations");
+        case "consultation":
+          final Map<String, dynamic> evidences = _evidence_common_name;
+          String symptom = '';
+          for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
+            symptom = symptom + e['common_name'] ;
+            if (symptom.isNotEmpty) {
+              symptom += ', ';
+            }
+          }
+          
+            buf.write("consulation\n");
+            buf.write("test age: $age , sex: $sex \nมีอาการดังนี้: $symptom \nซึ่งมีสิ่งที่ต้องระวัง: \nแพ้ยา:$medicalConditions, \nแพ้อาหาร: $foodAllergies,");
+          break;
+          case "consultation_24":
+          final Map<String, dynamic> evidences = _evidence_common_name;
+          String symptom = '';
+          for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
+            symptom = symptom + e['common_name'] ;
+            if (symptom.isNotEmpty) {
+              symptom += ', ';
+            }
+          }
+          
+            buf.write("consultation_24\n");
+            buf.write("test age: $age , sex: $sex \nมีอาการดังนี้: $symptom \nซึ่งมีสิ่งที่ต้องระวัง: \nแพ้ยา:$medicalConditions, \nแพ้อาหาร: $foodAllergies,");
           break;
         case "emergency":
-            buf.write("emergency");           
+          final Map<String, dynamic> evidences = _evidence_common_name;
+          String symptom = '';
+          for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
+            symptom = symptom + e['common_name'] ;
+            if (symptom.isNotEmpty) {
+              symptom += ', ';
+            }
+          } 
+            buf.write("emergency\n");
+            buf.write("ติดต่อโรงพยาบาลโดยด่วน \nติดต่อโรงพยาบาล : 1669");
           break;
         default:
           buf.write("do not have triage");

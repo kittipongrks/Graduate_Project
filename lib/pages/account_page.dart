@@ -231,16 +231,16 @@ Future<dynamic> LoadUserInfo() async {
                                 style: const TextStyle(color: Colors.black),
                                 items: const [
                                   DropdownMenuItem(
-                                    value: 'Male',
+                                    value: 'male',
                                     child: Text(
-                                      'Male',
+                                      'male',
                                       style: TextStyle(color: Color.fromARGB(255, 0, 0, 0), ), // ใช้สีเดียวกับ BoxDecoration
                                     ),
                                   ),
                                   DropdownMenuItem(
-                                    value: 'Female',
+                                    value: 'female',
                                     child: Text(
-                                      'Female',
+                                      'female',
                                       style: TextStyle(color: Color.fromARGB(255, 0, 0, 0)),
                                     ),
                                   ),
