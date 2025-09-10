@@ -95,7 +95,6 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
     await _controller?.handleUserInput(txt);
   }
   void _DraggableButton(BuildContext context) {
-  final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
   showDialog(
     context: context,
     builder: (BuildContext context) {
@@ -184,7 +183,8 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
             IconButton(
               icon: const Icon(Icons.grid_view_rounded),
               onPressed: () {
-                _DraggableButton(context);
+                _DraggableButton(context
+                );
               },
             ),
           ],
@@ -215,14 +215,25 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
                           Widget content;
                           switch (m.type) {
                             case MessageType.text:
-                              content = Text(
-                                m.text ?? "",
-                                style: const TextStyle(fontSize: 16, color: Colors.black87),
+                              content = 
+                              Padding(
+                                padding: const EdgeInsets.all(12.0),
+                                child: Text(
+                                  m.text ?? "",
+                                  style: const TextStyle(fontSize: 16, color: Colors.black87),
+                                ),
                               );
                               break;
 
-                            case MessageType.card:
-                              content = _buildCardMessage(m.textreuslt ?? {});
+                            case MessageType.cardEvidence:
+                              content = _buildCardMessageEvidence(m.textreuslt ?? {});
+                              break;
+
+                            case MessageType.cardDiagnosis:
+                              content = _buildCardMessageDiagnosis(m.textreuslt ?? {});
+                              break;
+                            case MessageType.cardSuggest:
+                              content = _buildCardMessageSuggest(m.textreuslt ?? {});
                               break;
 
                             case MessageType.chart:
@@ -256,7 +267,6 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
                                   Container(
                                     constraints: BoxConstraints(
                                         maxWidth: MediaQuery.of(context).size.width * 0.7),
-                                    padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: color,
@@ -419,6 +429,7 @@ Widget _buildTextButton(String text, VoidCallback onPressed) {
 }
 
 Widget _buildFunctionButton(IconData icon, String label, VoidCallback onTap) {
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -442,18 +453,355 @@ Widget _buildFunctionButton(IconData icon, String label, VoidCallback onTap) {
       ),
     );
   }
+ 
+Widget _buildCardMessageEvidence(Map<String, dynamic> data) {
+  final evidences = data['evidences'] as Map<String, dynamic>? ?? {};
+  final supporting =
+      List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? []);
+  final conflicting =
+      List<Map<String, dynamic>>.from(evidences['conflicting_evidence'] ?? []);
+  final unconfirmed =
+      List<Map<String, dynamic>>.from(evidences['unconfirmed_evidence'] ?? []);
 
-  Widget _buildCardMessage(Map<String, dynamic> data) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(data["title"] ?? "", style: const TextStyle(fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      Text("มูลค่า: ${data["aum"] ?? "-"}"),
-      Text("กำไร/ขาดทุน: ${data["profit"] ?? "-"}"),
-    ],
+  return Card(
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+    elevation: 3,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                data["title"] ?? "ข้อมูลอาการ",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios,
+                  size: 16, color: Colors.black54),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Supporting evidence
+          if (supporting.isNotEmpty) ...[
+            const Text("อาการ/ปัจจัยที่สนับสนุน (+):",
+                style: TextStyle(color: Colors.black54, fontSize: 14)),
+            const SizedBox(height: 8),
+            ...supporting.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      const Text("+ ",
+                          style: TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Text(e["common_name"] ?? "-"),
+                      ),
+                    ],
+                  ),
+                )),
+            const SizedBox(height: 12),
+          ],
+
+          // Conflicting evidence
+          if (conflicting.isNotEmpty) ...[
+            const Text("อาการ/ปัจจัยที่ขัดแย้ง (-):",
+                style: TextStyle(color: Colors.black54, fontSize: 14)),
+            const SizedBox(height: 8),
+            ...conflicting.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      const Text("- ",
+                          style: TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Text(e["common_name"] ?? "-"),
+                      ),
+                    ],
+                  ),
+                )),
+            const SizedBox(height: 12),
+          ],
+
+          // Unconfirmed evidence
+          if (unconfirmed.isNotEmpty) ...[
+            const Text("อาการ/ปัจจัยที่ยังไม่ยืนยัน (?):",
+                style: TextStyle(color: Colors.black54, fontSize: 14)),
+            const SizedBox(height: 8),
+            ...unconfirmed.map((e) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      const Text("? ",
+                          style: TextStyle(
+                              color: Colors.orange,
+                              fontWeight: FontWeight.bold)),
+                      Expanded(
+                        child: Text(e["common_name"] ?? "-"),
+                      ),
+                    ],
+                  ),
+                )),
+            const SizedBox(height: 12),
+          ],
+
+          const Divider(),
+          const Text(
+            "(นี่คือข้อมูลที่ใช้ในการประเมินอัตโนมัติ)",
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
+        ],
+      ),
+    ),
   );
 }
+
+Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
+  final conditions = (data['conditions'] as List?) ?? [];
+  final triage = data['triage'];
+  if(triage['level'] == "self_care"){
+    triage['level'] = "ดูแลตนเองที่บ้าน";
+  } else if (triage['level'] == "consultation"){
+    triage['level'] = "แนะนำให้พบแพทย์";
+  } else if (triage['level'] == "consultation24"){
+    triage['level'] = "แนะนำให้พบแพทย์ภายใน 24 ชั่วโมง";
+  } else if (triage['level'] == "emergency"){
+    triage['level'] = "พบแพทย์ฉุกเฉิน";
+  } 
+
+
+  return Card(
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+    elevation: 3,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                data["title"] ?? "",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios,
+                  size: 16, color: Colors.black54),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Conditions list
+          if (conditions.isNotEmpty) ...[
+            const Text(
+              "ภาวะที่เป็นไปได้:",
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            ...conditions.map((c) {
+              final prob = (c["probability"] as double?) ?? 0.0;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        c["name_th"] ?? "-",
+                        style: const TextStyle(fontSize: 15),
+                      ),
+                    ),
+                    Text(
+                      "${(prob * 100).toStringAsFixed(1)}%",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+
+          const SizedBox(height: 16),
+
+          // Triage info
+          if (triage != null) ...[
+            const Text(
+              "คำแนะนำเบื้องต้น:",
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              triage["recommendation"] ?? "-",
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Text("ระดับความรุนแรง: "),
+                Text(
+                  triage["level"] ?? "-",
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
+  final triageLevel = data['triage_level'];
+  final adviceList = (data['advice_list'] as List?) ?? [];
+  
+  if (triageLevel == "emergency"){
+    return Card(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      elevation: 3,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  data["title"] ?? "",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios,
+                    size: 16, color: Colors.black54),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "คำแนะนำเบื้องต้น:",
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "กรุณาไปพบแพทย์ฉุกเฉินทันที",
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  return Card(
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+    ),
+    elevation: 3,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                data["title"] ?? "",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios,
+                  size: 16, color: Colors.black54),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Advice list
+          if (adviceList.isNotEmpty) ...[
+            const Text(
+              "คำแนะนำเบื้องต้น:",
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
+            const SizedBox(height: 8),
+            ...adviceList.map((section) {
+              final topic = section["topic"] ?? "";
+              final contents = List<String>.from(section["content"] ?? []);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      topic,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    ...contents.map(
+                      (c) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("• "),
+                            Expanded(child: Text(c)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    ),
+  );
+}
+
+
 
 Widget _buildChartMessage(Map<String, dynamic> data) {
   return Column(

@@ -32,7 +32,7 @@ enum ChatSender { user, bot, system, error }
 
 enum EvidenceChoice { present, absent, unknown }
 
-enum MessageType { text, card, chart }
+enum MessageType { text, cardEvidence , cardDiagnosis ,cardSuggest, chart }
 
 class ChatMessage {
   final String id;
@@ -313,11 +313,13 @@ class DiagnosisQuestion {
 class DiagnosisCondition {
   final String id;
   final String name;
+  final String? name_th;
   final double probability;
-  DiagnosisCondition({required this.id, required this.name, required this.probability});
+  DiagnosisCondition({required this.id, required this.name, required this.probability , this.name_th});
   factory DiagnosisCondition.fromJson(Map<String, dynamic> json) => DiagnosisCondition(
         id: json['id'] as String,
         name: json['name'] as String? ?? 'Unknown',
+        name_th :json['name_th'] as String? ?? 'Unknown',
         probability: (json['probability'] as num?)?.toDouble() ?? 0,
       );
 }
@@ -400,7 +402,6 @@ class InfermedicaChatController extends ChangeNotifier {
   final List<ChatMessage> _messages = [];
   final List<EvidenceItem> _evidence = [];
 
-  
   Map<String, dynamic> _evidence_common_name = {};
 
   bool _isBusy = false;
@@ -426,6 +427,17 @@ class InfermedicaChatController extends ChangeNotifier {
     notifyListeners();
   });
 }
+
+void resetChat() {
+  _messages.clear();
+  _evidence.clear();
+  _lastDiagnosis = null;
+  questionCount = 0;
+  _evidence_common_name.clear();
+  _isBusy = false;
+  notifyListeners();
+}
+
 
   void addErrorMessage(String text) {
     _messages.add(ChatMessage(
@@ -456,9 +468,19 @@ class InfermedicaChatController extends ChangeNotifier {
     notifyListeners();
 
     callParse(rawUserText);
-    // If we are currently answering a follow‑up question expecting yes/no/maybe,
-    // try to map quick answer directly to evidence for that pending question.
+    
   }
+  void handleUserChoice(String choice) {
+  if (_awaitingUserChoice) {
+    _awaitingUserChoice = false;
+    if (choice == "ถามต่อ") {
+      _runDiagnosisCycle(); // ถามต่อ
+    } else {
+      _finishDiagnosis(_lastDiagnosis!); // หยุดแล้วสรุป
+    }
+  }
+}
+
 
   void callParse(String rawUserText) async{
     if (_lastDiagnosis?.question != null) {
@@ -546,100 +568,91 @@ class InfermedicaChatController extends ChangeNotifier {
     }
   }
 
-  Future<void> _runDiagnosisCycle() async {
-    _isBusy = true;
-    notifyListeners();
-    try {
-      final dx = await service.diagnosis(
-        evidence: _evidence,
-        age: age,
-        sex: sex,
-        noGroups: true,
-      );
-      _lastDiagnosis = dx;
+  int questionsInBatch = 0;     // จำนวนคำถามในรอบปัจจุบัน
+  bool _awaitingUserChoice = false;
 
-      if (dx.isFinished || questionCount >= 1) {
-        final tx = await service.triage(
-          evidence: _evidence, 
-          age: age, 
-          sex: sex
-        );
-        // ใส่ค่า triage ลงไปใน DiagnosisResult
-        final updatedDx = DiagnosisResult(
-          question: dx.question,
-          conditions: dx.conditions,
-          triage: tx,
-        );
-        _lastDiagnosis = updatedDx;
-        
+Future<void> _runDiagnosisCycle() async {
+  _isBusy = true;
+  notifyListeners();
+  try {
+    final dx = await service.diagnosis(
+      evidence: _evidence,
+      age: age,
+      sex: sex,
+      noGroups: true,
+    );
+    _lastDiagnosis = dx;
 
-        _evidence_common_name = await service.explain(
-          evidence: _evidence,
-          age: age,
-          sex: sex,
-          target: _lastDiagnosis?.conditions.first.id ?? '',);
-        print(_evidence_common_name);
-
-        final getevidenceText = await _buildFinalEvidenceText();
-        _messages.add(ChatMessage(
-          id: const Uuid().v4(),
-          sender: ChatSender.bot,
-          type: MessageType.text,
-          text : getevidenceText,
-        ));
-
-        // Show final diagnosis summary.
-        final summaryEn = _buildFinalSummaryText(updatedDx);
-        final data = await _MaptoCardForSummary(updatedDx);
-        
-        _messages.add(ChatMessage(
-          id: const Uuid().v4(),
-          sender: ChatSender.bot,
-          type: MessageType.text,
-          text: await summaryEn,
-          payload: {'diagnosis': updatedDx},
-        ));
-
-        final selfcare = _buildFinalSuggest(updatedDx);
-        _messages.add(ChatMessage(
-          id: const Uuid().v4(), 
-          sender: ChatSender.bot,
-          type: MessageType.card,
-          text: await selfcare,
-          payload: {'diagnosis': updatedDx},
-        ));
-      } 
-      
-      
-      
-      else {
-        // Show follow‑up question.
-        final qTextEn = _buildQuestionDisplayText(dx.question!);
-        final qTextTh = await llmsChangeEngToThai(qTextEn);
-        // change to thai
-        _messages.add(ChatMessage(
-          id: const Uuid().v4(),
-          sender: ChatSender.bot,
-          type: MessageType.text,
-          text: qTextTh,
-          payload: {'question': dx.question},
-        ));
-        questionCount++;
-      }
-      notifyListeners();
-    } catch (e) {
-      addErrorMessage('เกิดข้อผิดพลาดในการเรียก diagnosis: $e');
-      print('เกิดข้อผิดพลาดในการเรียก diagnosis: $e');
-    } finally {
-      _isBusy = false;
-      notifyListeners();
-      print(_isBusy);
+    // ถ้า service บอกว่าจบเอง → สรุปผลเลย
+    if (dx.isFinished) {
+      await _finishDiagnosis(dx);
+      return;
     }
+
+    // ถ้ายังไม่จบ → ถามคำถามใหม่
+    final qTextEn = _buildQuestionDisplayText(dx.question!);
+    final qTextTh = await llmsChangeEngToThai(qTextEn);
+    _messages.add(ChatMessage(
+      id: const Uuid().v4(),
+      sender: ChatSender.bot,
+      type: MessageType.text,
+      text: qTextTh,
+      payload: {'question': dx.question},
+    ));
+
+    notifyListeners();
+
+  } catch (e) {
+    addErrorMessage('เกิดข้อผิดพลาดในการเรียก diagnosis: $e');
+  } finally {
+    _isBusy = false;
+    notifyListeners();
   }
-  
+}
+
+
+Future<void> _finishDiagnosis(DiagnosisResult dx) async {
+  final tx = await service.triage(
+    evidence: _evidence,
+    age: age,
+    sex: sex,
+  );
+
+  final updatedDx = DiagnosisResult(
+    question: dx.question,
+    conditions: dx.conditions,
+    triage: tx,
+  );
+  _lastDiagnosis = updatedDx;
+
+  final dataEvidence = await _MaptoCardForcardEvidence(updatedDx);
+  _messages.add(ChatMessage(
+    id: const Uuid().v4(),
+    sender: ChatSender.bot,
+    type: MessageType.cardEvidence,
+    textreuslt: dataEvidence,
+  ));
+
+  final dataDiagnosis = await _MaptoCardForcardDiagnosis(updatedDx);
+  _messages.add(ChatMessage(
+    id: const Uuid().v4(),
+    sender: ChatSender.bot,
+    type: MessageType.cardDiagnosis,
+    textreuslt: dataDiagnosis,
+    payload: {'diagnosis': updatedDx},
+  ));
+
+  final dataselfcare = await _MaptoCardForcardSuggest(updatedDx);
+  _messages.add(ChatMessage(
+    id: const Uuid().v4(),
+    sender: ChatSender.bot,
+    type: MessageType.cardSuggest,
+    textreuslt: dataselfcare,
+    payload: {'diagnosis': updatedDx},
+  ));
+}
 
   
-
 
   // ---------------------------------------------------------------------------
   // HELPER TEXT BUILDERS
@@ -696,12 +709,21 @@ class InfermedicaChatController extends ChangeNotifier {
     buf.writeln('\n(นี่คือข้อมูลที่ใช้ในการประเมินอัตโนมัติ)');
     return buf.toString().trim();
   }
-
-  Future<Map<String, dynamic >> _MaptoCardForSummary (DiagnosisResult dx) async{
+    Future<Map<String, dynamic >> _MaptoCardForcardEvidence (DiagnosisResult dx) async{
     return {
-      'conditions': dx.conditions.map((c) => {
+      'title' : "ข้อมูลอาการ",
+      'evidences': _evidence_common_name,
+    };
+  }
+
+  Future<Map<String, dynamic >> _MaptoCardForcardDiagnosis (DiagnosisResult dx) async{
+    List c_thai_List = await collect_conditions_name(dx);
+    return {
+      'title' : "คาดการณ์เบื้องต้น",
+      'conditions': dx.conditions.take(5).map((c) => {
         'id': c.id,
         'name': c.name,
+        'name_th': c_thai_List[dx.conditions.indexOf(c)],
         'probability': c.probability,
       }).toList(),
       'triage': dx.triage != null ? {
@@ -711,97 +733,40 @@ class InfermedicaChatController extends ChangeNotifier {
     };
   }
 
-  Future<String> _buildFinalSummaryText(DiagnosisResult dx) async{
-    final buf = StringBuffer();
-    buf.writeln('สรุปผลเบื้องต้น:');
-    buf.writeln('มีโอกาสเป็น:');
-    if (dx.conditions.isEmpty) {
-      buf.writeln('- ไม่พบโรคที่เป็นไปได้ (ข้อมูลไม่เพียงพอ)');
-    } else {
-      final c_thai_list = await collect_conditions_name(dx);
+  Future<Map<String , dynamic>> _MaptoCardForcardSuggest(DiagnosisResult dx) async {
+  final something = await self_care_suggestion(
+    dx, 
+    age, 
+    sex,
+    medicalConditions, 
+    foodAllergies, 
+    _evidence_common_name,
+  );
 
-        // Loop through both lists simultaneously using an index
-        for (int i = 0; i < dx.conditions.take(5).length; i++) {
-          final c = dx.conditions[i];
-          final c_thai = c_thai_list[i];
-          final pct = (c.probability * 100).toStringAsFixed(1);
-          
-          buf.writeln('\n- ${c.name}: ${c_thai} ประมาณ: ${pct}%');
-        }
-      
-    }
-    if (dx.triage != null) {
-      buf.writeln('\nระดับคำแนะนำ: ${dx.triage!.level}');
-      if (dx.triage!.recommendation != null) {
-        buf.writeln(dx.triage!.recommendation!);
-      }
-    }
-    buf.writeln('\n(นี่คือการประเมินอัตโนมัติ ไม่ใช่วินิจฉัยจากแพทย์จริง)');
-    return buf.toString().trim();
-  }
+  try {
+    // 🔹 ตัด ```json และ ``` ออก
+    String cleaned = something
+        .replaceAll("```json", "")
+        .replaceAll("```", "")
+        .trim();
+  print(cleaned);
+    final Map<String, dynamic> parsed = jsonDecode(cleaned);
 
-  Future<String> _buildFinalSuggest(DiagnosisResult dx) async{
-    final buf = StringBuffer();
-    if(dx.triage != null){
-      switch(dx.triage!.level.trim()){
-        case "self_care":
-          final Map<String, dynamic> evidences = _evidence_common_name;
-          String symptom = '';
-          for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
-            symptom = symptom + e['common_name'] ;
-            if (e['common_name'].isNotEmpty) {
-              symptom += ', ';
-            }
-            
-          }
-            buf.write("self_care\n");
-            buf.write("test age: $age , sex: $sex \nมีอาการดังนี้: $symptom \nซึ่งมีสิ่งที่ต้องระวัง: \nแพ้ยา:$medicalConditions, \nแพ้อาหาร: $foodAllergies,");
-          break;
-        case "consultation":
-          final Map<String, dynamic> evidences = _evidence_common_name;
-          String symptom = '';
-          for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
-            symptom = symptom + e['common_name'] ;
-            if (symptom.isNotEmpty) {
-              symptom += ', ';
-            }
-          }
-          
-            buf.write("consulation\n");
-            buf.write("test age: $age , sex: $sex \nมีอาการดังนี้: $symptom \nซึ่งมีสิ่งที่ต้องระวัง: \nแพ้ยา:$medicalConditions, \nแพ้อาหาร: $foodAllergies,");
-          break;
-          case "consultation_24":
-          final Map<String, dynamic> evidences = _evidence_common_name;
-          String symptom = '';
-          for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
-            symptom = symptom + e['common_name'] ;
-            if (symptom.isNotEmpty) {
-              symptom += ', ';
-            }
-          }
-          
-            buf.write("consultation_24\n");
-            buf.write("test age: $age , sex: $sex \nมีอาการดังนี้: $symptom \nซึ่งมีสิ่งที่ต้องระวัง: \nแพ้ยา:$medicalConditions, \nแพ้อาหาร: $foodAllergies,");
-          break;
-        case "emergency":
-          final Map<String, dynamic> evidences = _evidence_common_name;
-          String symptom = '';
-          for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
-            symptom = symptom + e['common_name'] ;
-            if (symptom.isNotEmpty) {
-              symptom += ', ';
-            }
-          } 
-            buf.write("emergency\n");
-            buf.write("ติดต่อโรงพยาบาลโดยด่วน \nติดต่อโรงพยาบาล : 1669");
-          break;
-        default:
-          buf.write("do not have triage");
-          break;
-      }
-    }
-    return buf.toString().trim();
+    return {
+      'title': "คำแนะนำ",
+      'triage_level': parsed['triage_level'] ?? "-",
+      'advice_list': parsed['advice_list'] ?? [],
+    };
+  } catch (e) {
+    print("JSON parse error: $e");
+    return {
+      'title': "คำแนะนำ",
+      'triage_level': "-",
+      'advice_list': [],
+    };
   }
+}
+
 
 
   // ---------------------------------------------------------------------------
@@ -809,6 +774,11 @@ class InfermedicaChatController extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   Future<EvidenceChoice?> _mapUserQuickAnswer(String text) async{
+    final lastChatMessage = _messages.last;
+    final lastQuestionText = lastChatMessage.text; 
+    print("----------------------------------------------------");
+    print(lastQuestionText);
+
     final t = text.trim().toLowerCase();
     if (['y', 'yes', 'ใช่', 'มี', 'present', 'true', '1'].contains(t)) {
       return EvidenceChoice.present;
@@ -826,7 +796,7 @@ class InfermedicaChatController extends ChangeNotifier {
       - If the input expresses uncertainty or doubt, respond with "unknown".
 
       Only output the exact keyword: present, absent, or unknown.
-
+      Last question asked to user: $lastQuestionText
       User input: $text """;
 
       final body = jsonEncode({
