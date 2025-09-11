@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:dahcpplication/pages/page.dart';
-import 'package:dahcpplication/pages/test_chat.dart';
 class NavigationMenu extends StatefulWidget {
   const NavigationMenu({super.key});
 
@@ -21,7 +20,7 @@ class _NavigationMenu extends State<NavigationMenu> {
 
   final List<Widget> _pages = [
     ChatDiagnosisPage(),
-    ChatStartScreen(),
+    ChatDiagnosisPage(),
     MyMapPage(),
     AccountPage(),
     

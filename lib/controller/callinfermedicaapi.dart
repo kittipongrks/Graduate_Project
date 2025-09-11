@@ -116,14 +116,24 @@ class InfermedicaService {
   final http.Client _client;
 
   Map<String, String> _headers() => {
-        'Content-Type': 'application/json',
-        'Accept' : 'application/json',
-        'App-Id': infermedicaAppId,
-        'App-Key': infermedicaAppKey,
+    'Content-Type': 'application/json',
+    'Accept' : 'application/json',
+    'App-Id': infermedicaAppId,
+    'App-Key': infermedicaAppKey,
 
-        'Dev-Mode':'true',
-        if (case_id != null) 'Interview-Id' : case_id!,
-      };
+    'Dev-Mode':'true',
+    if (case_id != null) 'Interview-Id' : case_id!,
+  };
+  
+  Future<void> getSymptomName(String symptomId)async{
+    final responce = await http.get(
+      Uri.parse('$infermedicaBaseUrl/symptoms/$symptomId'),
+      headers: _headers(),
+    );
+    final symptom_name = jsonDecode(responce.body)['name'];
+    print(symptom_name);
+  }
+
 
   /// Call /parse to extract mentions (symptoms / risk factors) from user free text.
   Future<ParseResult> parseText({
@@ -428,17 +438,6 @@ class InfermedicaChatController extends ChangeNotifier {
   });
 }
 
-void resetChat() {
-  _messages.clear();
-  _evidence.clear();
-  _lastDiagnosis = null;
-  questionCount = 0;
-  _evidence_common_name.clear();
-  _isBusy = false;
-  notifyListeners();
-}
-
-
   void addErrorMessage(String text) {
     _messages.add(ChatMessage(
       id: const Uuid().v4(), 
@@ -468,19 +467,9 @@ void resetChat() {
     notifyListeners();
 
     callParse(rawUserText);
-    
+    // If we are currently answering a follow‑up question expecting yes/no/maybe,
+    // try to map quick answer directly to evidence for that pending question.
   }
-  void handleUserChoice(String choice) {
-  if (_awaitingUserChoice) {
-    _awaitingUserChoice = false;
-    if (choice == "ถามต่อ") {
-      _runDiagnosisCycle(); // ถามต่อ
-    } else {
-      _finishDiagnosis(_lastDiagnosis!); // หยุดแล้วสรุป
-    }
-  }
-}
-
 
   void callParse(String rawUserText) async{
     if (_lastDiagnosis?.question != null) {
@@ -542,7 +531,6 @@ void resetChat() {
         age: age,
         sex: sex,
       );
-
       if (parse.mentions.isEmpty) {
         // Add a bot message telling user we couldn't detect symptoms & ask to rephrase.
         _messages.add(ChatMessage(
@@ -568,90 +556,93 @@ void resetChat() {
     }
   }
 
-  int questionsInBatch = 0;     // จำนวนคำถามในรอบปัจจุบัน
-  bool _awaitingUserChoice = false;
+  Future<void> _runDiagnosisCycle() async {
+    _isBusy = true;
+    notifyListeners();
+    try {
+      final dx = await service.diagnosis(
+        evidence: _evidence,
+        age: age,
+        sex: sex,
+        noGroups: true,
+      );
+      _lastDiagnosis = dx;
 
-Future<void> _runDiagnosisCycle() async {
-  _isBusy = true;
-  notifyListeners();
-  try {
-    final dx = await service.diagnosis(
-      evidence: _evidence,
-      age: age,
-      sex: sex,
-      noGroups: true,
-    );
-    _lastDiagnosis = dx;
+      if (dx.isFinished || questionCount >= 5) {
+        final tx = await service.triage(
+          evidence: _evidence, 
+          age: age, 
+          sex: sex
+        );
+        // ใส่ค่า triage ลงไปใน DiagnosisResult
+        final updatedDx = DiagnosisResult(
+          question: dx.question,
+          conditions: dx.conditions,
+          triage: tx,
+        );
+        _lastDiagnosis = updatedDx;
+        
 
-    // ถ้า service บอกว่าจบเอง → สรุปผลเลย
-    if (dx.isFinished) {
-      await _finishDiagnosis(dx);
-      return;
+        _evidence_common_name = await service.explain(
+          evidence: _evidence,
+          age: age,
+          sex: sex,
+          target: _lastDiagnosis?.conditions.first.id ?? '',);
+        print(_evidence_common_name);
+
+        final dataEvidence = await _MaptoCardForcardEvidence(updatedDx);
+        _messages.add(ChatMessage(
+          id: const Uuid().v4(),
+          sender: ChatSender.bot,
+          type: MessageType.cardEvidence,
+          textreuslt : dataEvidence,
+        ));
+
+        // Show final diagnosis summary.
+        // final summaryEn = _buildFinalSummaryText(updatedDx);
+        final dataDiagnosis = await _MaptoCardForcardDiagnosis(updatedDx);
+        _messages.add(ChatMessage(
+          id: const Uuid().v4(),
+          sender: ChatSender.bot,
+          type: MessageType.cardDiagnosis,
+          textreuslt: dataDiagnosis,
+          payload: {'diagnosis': updatedDx},
+        ));
+
+        final dataselfcare = await _MaptoCardForcardSuggest(updatedDx);
+        _messages.add(ChatMessage(
+          id: const Uuid().v4(), 
+          sender: ChatSender.bot,
+          type: MessageType.cardSuggest,
+          textreuslt: dataselfcare,
+          payload: {'diagnosis': updatedDx},
+        ));
+        return ;
+      } 
+      else {
+        // Show follow‑up question.
+        final qTextEn = _buildQuestionDisplayText(dx.question!);
+        final qTextTh = await llmsChangeEngToThai(qTextEn);
+        // change to thai
+        _messages.add(ChatMessage(
+          id: const Uuid().v4(),
+          sender: ChatSender.bot,
+          type: MessageType.text,
+          text: qTextTh,
+          payload: {'question': dx.question},
+        ));
+        questionCount++;
+      }
+      notifyListeners();
+    } catch (e) {
+      addErrorMessage('เกิดข้อผิดพลาดในการเรียก diagnosis: $e');
+      print('เกิดข้อผิดพลาดในการเรียก diagnosis: $e');
+    } finally {
+      _isBusy = false;
+      notifyListeners();
+      print(_isBusy);
     }
-
-    // ถ้ายังไม่จบ → ถามคำถามใหม่
-    final qTextEn = _buildQuestionDisplayText(dx.question!);
-    final qTextTh = await llmsChangeEngToThai(qTextEn);
-    _messages.add(ChatMessage(
-      id: const Uuid().v4(),
-      sender: ChatSender.bot,
-      type: MessageType.text,
-      text: qTextTh,
-      payload: {'question': dx.question},
-    ));
-
-    notifyListeners();
-
-  } catch (e) {
-    addErrorMessage('เกิดข้อผิดพลาดในการเรียก diagnosis: $e');
-  } finally {
-    _isBusy = false;
-    notifyListeners();
   }
-}
-
-
-Future<void> _finishDiagnosis(DiagnosisResult dx) async {
-  final tx = await service.triage(
-    evidence: _evidence,
-    age: age,
-    sex: sex,
-  );
-
-  final updatedDx = DiagnosisResult(
-    question: dx.question,
-    conditions: dx.conditions,
-    triage: tx,
-  );
-  _lastDiagnosis = updatedDx;
-
-  final dataEvidence = await _MaptoCardForcardEvidence(updatedDx);
-  _messages.add(ChatMessage(
-    id: const Uuid().v4(),
-    sender: ChatSender.bot,
-    type: MessageType.cardEvidence,
-    textreuslt: dataEvidence,
-  ));
-
-  final dataDiagnosis = await _MaptoCardForcardDiagnosis(updatedDx);
-  _messages.add(ChatMessage(
-    id: const Uuid().v4(),
-    sender: ChatSender.bot,
-    type: MessageType.cardDiagnosis,
-    textreuslt: dataDiagnosis,
-    payload: {'diagnosis': updatedDx},
-  ));
-
-  final dataselfcare = await _MaptoCardForcardSuggest(updatedDx);
-  _messages.add(ChatMessage(
-    id: const Uuid().v4(),
-    sender: ChatSender.bot,
-    type: MessageType.cardSuggest,
-    textreuslt: dataselfcare,
-    payload: {'diagnosis': updatedDx},
-  ));
-}
-
   
 
   // ---------------------------------------------------------------------------
@@ -680,41 +671,45 @@ Future<void> _finishDiagnosis(DiagnosisResult dx) async {
     return c_thai_List ;
   }
 
-  Future<String> _buildFinalEvidenceText() async {
-    final buf = StringBuffer();
-    buf.writeln('ข้อมูลอาการ:');
+  // Future<String> _buildFinalEvidenceText() async {
+  //   final buf = StringBuffer();
+  //   buf.writeln('ข้อมูลอาการ:');
 
-    if (_evidence_common_name.isEmpty) {
-      buf.writeln('- ไม่มีข้อมูลอาการ/ปัจจัยเสี่ยง');
-    } else {
-      // loop แต่ละประเภท evidence
-      final Map<String, dynamic> evidences = _evidence_common_name;
+  //   if (_evidence_common_name.isEmpty) {
+  //     buf.writeln('- ไม่มีข้อมูลอาการ/ปัจจัยเสี่ยง');
+  //   } else {
+  //     // loop แต่ละประเภท evidence
+  //     final Map<String, dynamic> evidences = _evidence_common_name;
 
-      // supporting = +
-      for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
-        buf.writeln('- ${e['common_name']}: +');
-      }
+  //     // supporting = +
+  //     for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
+  //       buf.writeln('- ${e['common_name']}: +');
+  //     }
 
-      // conflicting = -
-      for (final e in List<Map<String, dynamic>>.from(evidences['conflicting_evidence'] ?? [])) {
-        buf.writeln('- ${e['common_name']}: -');
-      }
+  //     // conflicting = -
+  //     for (final e in List<Map<String, dynamic>>.from(evidences['conflicting_evidence'] ?? [])) {
+  //       buf.writeln('- ${e['common_name']}: -');
+  //     }
 
-      // unconfirmed = ?
-      for (final e in List<Map<String, dynamic>>.from(evidences['unconfirmed_evidence'] ?? [])) {
-        buf.writeln('- ${e['common_name']}: ?');
-      }
-    }
+  //     // unconfirmed = ?
+  //     for (final e in List<Map<String, dynamic>>.from(evidences['unconfirmed_evidence'] ?? [])) {
+  //       buf.writeln('- ${e['common_name']}: ?');
+  //     }
+  //   }
 
-    buf.writeln('\n(นี่คือข้อมูลที่ใช้ในการประเมินอัตโนมัติ)');
-    return buf.toString().trim();
-  }
-    Future<Map<String, dynamic >> _MaptoCardForcardEvidence (DiagnosisResult dx) async{
+  //   buf.writeln('\n(นี่คือข้อมูลที่ใช้ในการประเมินอัตโนมัติ)');
+  //   return buf.toString().trim();
+  // }
+
+  Future<Map<String, dynamic >> _MaptoCardForcardEvidence (DiagnosisResult dx) async{
+    print(_evidence);
+    print(_evidence_common_name);
     return {
       'title' : "ข้อมูลอาการ",
       'evidences': _evidence_common_name,
     };
   }
+  
 
   Future<Map<String, dynamic >> _MaptoCardForcardDiagnosis (DiagnosisResult dx) async{
     List c_thai_List = await collect_conditions_name(dx);
