@@ -56,7 +56,6 @@ Future<String> llmsChangeEngToThai(String prompt) async {
     body: body,
   );
   final dataEngtoThai = jsonDecode(responseEngtoThai.body);
-  print(dataEngtoThai);
 
   if (responseEngtoThai.statusCode == 200 && dataEngtoThai['candidates'] != null) {
     try {
@@ -98,7 +97,6 @@ Future<String> llmsChangeThaiToEng(String prompt) async {
     body: body,
   );
   final dataEngtoThai = jsonDecode(responseEngtoThai.body);
-  print(dataEngtoThai);
 
   if (responseEngtoThai.statusCode == 200 && dataEngtoThai['candidates'] != null) {
     try {
@@ -146,7 +144,6 @@ Future <String> SummariseData(String prompt) async {
     body: body,
   );
   final dataEngtoThai = jsonDecode(responseEngtoThai.body);
-  print(dataEngtoThai);
 
   if (responseEngtoThai.statusCode == 200 && dataEngtoThai['candidates'] != null) {
     try {
@@ -185,7 +182,6 @@ Future<String> Terminology_medical_translate(String prompt) async{
     body: body,
   );
   final dataEngtoThai = jsonDecode(responseEngtoThai.body);
-  print(dataEngtoThai);
 
   if (responseEngtoThai.statusCode == 200 && dataEngtoThai['candidates'] != null) {
     try {
@@ -211,7 +207,14 @@ Future<dynamic> self_care_suggestion(DiagnosisResult dx,int age, String gender ,
       }
       
     }
-  final prompt = """ "คุณคือผู้ช่วยสร้างคำแนะนำด้านสุขภาพสำหรับระบบ UI ของเรา ช่วยสร้างคำแนะนำจากข้อมูลผู้ป่วยที่ให้มา โดยผลลัพธ์ต้องอยู่ในรูปแบบ JSON object เท่านั้น และมี key และ value ดังนี้: `triage_level` สำหรับระดับความรุนแรง, `advice_title` สำหรับหัวข้อหลัก, และ `advice_list` สำหรับรายการคำแนะนำเป็นข้อๆ โดยแต่ละข้อมี `topic` และ `content` ตามข้อมูลด้านล่างนี้",
+  final prompt = """ "คุณคือผู้ช่วยสร้างคำแนะนำด้านสุขภาพ ช่วยสร้างคำแนะนำจากข้อมูลผู้ป่วยที่ให้มา 
+  โดยผลลัพธ์ต้องอยู่ในรูปแบบ JSON object เท่านั้น และมี key และ value ดังนี้: `triage_level` สำหรับระดับความรุนแรง, 
+  `advice_title` สำหรับหัวข้อหลัก, และ `advice_list` 
+  สำหรับรายการคำแนะนำเป็นข้อๆ โดยแต่ละข้อมี `topic` และ `content` ตามข้อมูลด้านล่างนี้
+  
+    โดยข้อมูลยาที่แนะนำจะต้องเป็นยาที่สามารถซื้อได้โดยไม่ต้องมีใบสั่งแพทย์ (OTC) 
+    และควรระบุชื่อยาที่เป็นที่รู้จักในท้องตลาดหรือก็คือข้อมูลยาสามัญประจำบ้านปี 2568
+    โดยให้บอกชื่อยาที่คนทั่วไปรู้จัก วิธีใช้แบบย่อๆ ให้ผู้ใช้เข้าใจง่าย",
   "data": {
     "triage_level": "${dx.triage!.level}",
     "patient_info": {
@@ -232,10 +235,15 @@ Future<dynamic> self_care_suggestion(DiagnosisResult dx,int age, String gender ,
       {
         "topic": "การดูแลตัวเองเบื้องต้น",
         "content": ["string", "string"],
-        "topic": "เมื่อใดควรพบแพทย์",
-        "content": ["string", "string"],
         "topic": "คำแนะนำเพิ่มเติม/ข้อควรระวัง",
-        "content": ["string", "string"]
+        "content": ["string", "string"],
+      }
+    ],
+    "medicine_list": [
+      {
+        "name": "string",
+        "usage": "string",
+        "precautions": "string"
       }
     ]
   }
@@ -256,7 +264,6 @@ Future<dynamic> self_care_suggestion(DiagnosisResult dx,int age, String gender ,
     body: body,
   );
   final dataEngtoThai = jsonDecode(response.body);
-  print(dataEngtoThai);
 
   if (response.statusCode == 200 && dataEngtoThai['candidates'] != null) {
     try {
@@ -270,62 +277,4 @@ Future<dynamic> self_care_suggestion(DiagnosisResult dx,int age, String gender ,
   } else {
     return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${response.body}';
   }
-}
-
-
-
-
-
-// Future<String> translateChangeThaiToEng(String prompt) async {
-//   final url = Uri.parse("http://10.0.2.2:5000/translate");
-
-//   final response = await http.post(
-//     url,
-//     headers: {
-//       "Content-Type": "application/json",
-//     },
-//     body: jsonEncode({
-//       "q": "$prompt",
-//       "source": "auto",
-//       "target": "en",
-//       "format": "text",
-//       "alternatives": 3,
-//     }),
-//   );
-
-//   if (response.statusCode == 200) {
-//     final data = jsonDecode(response.body);
-//     print(data);
-//     return data['translatedText'] ?? 'ไม่พบข้อความแปล';
-//   } else {
-//     print("Error: ${response.statusCode}");
-//     return 'เกิดข้อผิดพลาดในการแปล: ${response.statusCode}';
-//   }
-// }
-
-// Future<String> translateChangeEngToThai(String prompt) async {
-//   final url = Uri.parse("http://10.0.2.2:5000/translate");
-
-//   final response = await http.post(
-//     url,
-//     headers: {
-//       "Content-Type": "application/json",
-//     },
-//     body: jsonEncode({
-//       "q": "$prompt",
-//       "source": "auto",
-//       "target": "th",
-//       "format": "text",
-//       "alternatives": 3,
-//     }),
-//   );
-
-//   if (response.statusCode == 200) {
-//     final data = jsonDecode(response.body);
-//     print(data);
-//     return data['translatedText'] ?? 'ไม่พบข้อความแปล';
-//   } else {
-//     print("Error: ${response.statusCode}");
-//     return 'เกิดข้อผิดพลาดในการแปล: ${response.statusCode}';
-//   }
-// }
+} 

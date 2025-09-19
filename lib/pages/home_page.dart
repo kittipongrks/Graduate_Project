@@ -67,7 +67,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _buildCategoryCard("Doctor AI", Icons.health_and_safety, Colors.purple[200]! , onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => MyChatPage()),);
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => ChatDiagnosisPage()),);
                   },),
                   _buildCategoryCard("Diagnosis", Icons.medical_information, Colors.blue[200]! , onTap: () {
                     Navigator.push(context, MaterialPageRoute(builder: (context) => ChatDiagnosisPage()),);

@@ -2,11 +2,9 @@ import 'package:dahcpplication/theme/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:dahcpplication/auth/database.dart';
 import 'package:dahcpplication/controller/callinfermedicaapi.dart';
-import 'package:dahcpplication/pages/riskfactor_page.dart'; // สำหรับการถามคำถามผู้ใช้ก่อนเริ่มแชท ??
 import 'package:dahcpplication/pages/page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import 'package:dahcpplication/controller/gemini_generate.dart';
 
 class ChatDiagnosisPage extends StatefulWidget {
   const ChatDiagnosisPage({super.key});
@@ -16,7 +14,7 @@ class ChatDiagnosisPage extends StatefulWidget {
 }
 
 class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
-  InfermedicaChatController? _controller; // เปลี่ยนเป็น nullable
+  InfermedicaChatController? _controller;
   final TextEditingController _textCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   int? age;
@@ -59,7 +57,10 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
 
     _controller!.addListener(_onControllerChanged);
     _controller!.addSystemMessage(
-      'สวัสดี! ช่วยบอกเราเกี่ยวกับอาการทั้งหมดที่คุณกำลังเป็น แบบยาว ๆ หน่อยนะครับ\nจะได้ช่วยประเมินได้แม่นยำขึ้น'
+      'สวัสดี!'
+    );
+    _controller!.addSystemMessage(
+      'วันเจอเรื่องอะไรมา หรือมีอาการอะไรเล่ามาได้เลยครับ'
     );
 
     setState(() {
@@ -129,12 +130,8 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
               _buildFunctionButton(Icons.history, 'ประวัติ', () {
                 Navigator.pop(context);
               }),
-              _buildFunctionButton(Icons.location_pin, 'แผนที่', () {
+              _buildFunctionButton(Icons.save, 'บันทึกแชท', () async{
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const MyMapPage()),
-                );
               }),
               _buildFunctionButton(Icons.person, 'โปรไฟล์', () {
                 Navigator.pop(context);
@@ -228,16 +225,14 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
                             case MessageType.cardEvidence:
                               content = _buildCardMessageEvidence(m.textreuslt ?? {});
                               break;
-
                             case MessageType.cardDiagnosis:
                               content = _buildCardMessageDiagnosis(m.textreuslt ?? {});
                               break;
                             case MessageType.cardSuggest:
                               content = _buildCardMessageSuggest(m.textreuslt ?? {});
                               break;
-
-                            case MessageType.chart:
-                              content = _buildChartMessage(m.textreuslt ?? {});
+                            case MessageType.cardMedicine:  
+                              content = _buildCardMessageMedicine(m.textreuslt ?? {});
                               break;
                           }
                           final color = switch (m.sender) {
@@ -255,18 +250,9 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
                                 mainAxisSize: MainAxisSize.min,
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  if (!isMe)
-                                    const Padding(
-                                      padding: EdgeInsets.only(right: 6.0),
-                                      child: CircleAvatar(
-                                        radius: 18,
-                                        backgroundColor: Color(0xFFBDBDBD),
-                                        backgroundImage: AssetImage('assets/images/Doctor_image_1per1.png'),
-                                      ),
-                                    ),
                                   Container(
                                     constraints: BoxConstraints(
-                                        maxWidth: MediaQuery.of(context).size.width * 0.7),
+                                        maxWidth: MediaQuery.of(context).size.width * 0.8),
                                     decoration: BoxDecoration(
                                       gradient: LinearGradient(
                                         colors: color,
@@ -570,22 +556,40 @@ Widget _buildCardMessageEvidence(Map<String, dynamic> data) {
 Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
   final conditions = (data['conditions'] as List?) ?? [];
   final triage = data['triage'];
-  if(triage['level'] == "self_care"){
-    triage['level'] = "ดูแลตนเองที่บ้าน";
-  } else if (triage['level'] == "consultation"){
-    triage['level'] = "แนะนำให้พบแพทย์";
-  } else if (triage['level'] == "consultation24"){
-    triage['level'] = "แนะนำให้พบแพทย์ภายใน 24 ชั่วโมง";
-  } else if (triage['level'] == "emergency"){
-    triage['level'] = "พบแพทย์ฉุกเฉิน";
-  } 
 
+  // แปล triage เป็นข้อความภาษาไทย
+  String triageText = "-";
+  Color triageColor = Colors.black87;
+  if (triage != null) {
+    switch (triage['level']) {
+      case "self_care":
+        triageText = "ดูแลตนเองที่บ้าน";
+        triageColor = Colors.green;
+        break;
+      case "consultation":
+        triageText = "แนะนำให้พบแพทย์";
+        triageColor = Colors.orange;
+        break;
+      case "consultation_24":
+        triageText = "แนะนำให้พบแพทย์ภายใน 24 ชั่วโมง";
+        triageColor = Colors.deepOrange;
+        break;
+      case "emergency":
+        triageText = "พบแพทย์ฉุกเฉิน";
+        triageColor = Colors.red;
+        break;
+      case "emergency_24":
+        triageText = "พบแพทย์ฉุกเฉินภายใน 24 ชั่วโมง";
+        triageColor = Colors.redAccent;
+        break;
+    }
+  }
 
   return Card(
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
     ),
-    elevation: 3,
+    elevation: 4,
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -596,17 +600,17 @@ Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                data["title"] ?? "",
+                data["title"] ?? "ผลการวินิจฉัยเบื้องต้น",
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 18,
+                  color: Colors.blueAccent,
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios,
-                  size: 16, color: Colors.black54),
+              const Icon(Icons.local_hospital, size: 24, color: Colors.blueAccent),
             ],
           ),
-          const SizedBox(height: 16),
+          const Divider(height: 24, thickness: 1.2),
 
           // Conditions list
           if (conditions.isNotEmpty) ...[
@@ -614,58 +618,57 @@ Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
               "ภาวะที่เป็นไปได้:",
               style: TextStyle(color: Colors.black54, fontSize: 14),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             ...conditions.map((c) {
               final prob = (c["probability"] as double?) ?? 0.0;
               return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Expanded(
                       child: Text(
                         c["name_th"] ?? "-",
-                        style: const TextStyle(fontSize: 15),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                     Text(
                       "${(prob * 100).toStringAsFixed(1)}%",
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
+                        fontSize: 14,
                         color: Colors.green,
                       ),
                     ),
                   ],
                 ),
               );
-            }),
-          ],
+            }).toList(),
+          ] else
+            const Text(
+              "ไม่มีข้อมูลภาวะที่เป็นไปได้",
+              style: TextStyle(color: Colors.black54),
+            ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
           // Triage info
           if (triage != null) ...[
-            const Text(
-              "คำแนะนำเบื้องต้น:",
-              style: TextStyle(color: Colors.black54, fontSize: 14),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              triage["recommendation"] ?? "-",
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
             Row(
               children: [
-                const Text("ระดับความรุนแรง: "),
+                const Text(
+                  "ระดับความรุนแรง: ",
+                  style: TextStyle(fontSize: 14),
+                ),
                 Text(
-                  triage["level"] ?? "-",
-                  style: const TextStyle(
-                    color: Colors.red,
+                  triageText,
+                  style: TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
+                    color: triageColor,
                   ),
                 ),
               ],
@@ -680,13 +683,14 @@ Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
 Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
   final triageLevel = data['triage_level'];
   final adviceList = (data['advice_list'] as List?) ?? [];
-  
-  if (triageLevel == "emergency"){
+
+  // กรณีฉุกเฉิน
+  if (triageLevel == "emergency") {
     return Card(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
       ),
-      elevation: 3,
+      elevation: 4,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -697,22 +701,18 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  data["title"] ?? "",
+                  data["title"] ?? "คำแนะนำฉุกเฉิน",
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                    fontSize: 18,
+                    color: Colors.redAccent,
                   ),
                 ),
-                const Icon(Icons.arrow_forward_ios,
-                    size: 16, color: Colors.black54),
+                const Icon(Icons.warning_amber_rounded,
+                    size: 26, color: Colors.redAccent),
               ],
             ),
-            const SizedBox(height: 16),
-            const Text(
-              "คำแนะนำเบื้องต้น:",
-              style: TextStyle(color: Colors.black54, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
+            const Divider(height: 24, thickness: 1.2),
             const Text(
               "กรุณาไปพบแพทย์ฉุกเฉินทันที",
               style: TextStyle(
@@ -727,11 +727,12 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
     );
   }
 
+  // กรณีทั่วไป
   return Card(
     shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(20),
     ),
-    elevation: 3,
+    elevation: 4,
     child: Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -742,50 +743,55 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                data["title"] ?? "",
+                data["title_suggest"] ?? "คำแนะนำ",
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
+                  fontSize: 18,
+                  color: Colors.blueAccent,
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios,
-                  size: 16, color: Colors.black54),
+              const Icon(Icons.info_outline,
+                  size: 24, color: Colors.blueAccent),
             ],
           ),
-          const SizedBox(height: 16),
+          const Divider(height: 24, thickness: 1.2),
 
           // Advice list
           if (adviceList.isNotEmpty) ...[
-            const Text(
-              "คำแนะนำเบื้องต้น:",
-              style: TextStyle(color: Colors.black54, fontSize: 14),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             ...adviceList.map((section) {
               final topic = section["topic"] ?? "";
               final contents = List<String>.from(section["content"] ?? []);
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      topic,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                    if (topic.isNotEmpty)
+                      Text(
+                        topic,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                          color: Colors.black87,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     ...contents.map(
                       (c) => Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        padding: const EdgeInsets.symmetric(vertical: 3),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text("• "),
-                            Expanded(child: Text(c)),
+                            const Text("• ",
+                                style: TextStyle(color: Colors.black54)),
+                            Expanded(
+                              child: Text(
+                                c,
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -793,23 +799,146 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
                   ],
                 ),
               );
-            }),
-          ],
+            }).toList(),
+          ] else
+            const Text(
+              "ไม่มีคำแนะนำเพิ่มเติม",
+              style: TextStyle(color: Colors.black54),
+            ),
         ],
       ),
     ),
   );
 }
 
+Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
+  final medicines = (data['medicine_list'] as List?) ?? [];
+
+  String _getMedicineImage(String name) {
+    // ตัวอย่าง mapping
+    if (name.contains("พารา")) {
+      return "assets/images/ยาพารา.png";
+    } else if (name.contains("แก้ไอ")) {
+      return "assets/images/ยาแก้ไอ.png";
+    } else if (name.contains("ลดกรด")) {
+      return "assets/images/ยาลดกรด.png";
+    }
+    // ถ้าไม่ตรง → ใช้ placeholder
+    return "assets/images/medicine_placeholder.png";
+  }
 
 
-Widget _buildChartMessage(Map<String, dynamic> data) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text("📊 Chart Example"),
-      Text("Labels: ${data["labels"]}"),
-      Text("Values: ${data["values"]}"),
-    ],
+  return Card(
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(20),
+    ),
+    elevation: 4,
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                data["title_medicine"] ?? "ข้อมูลยาแนะนำ",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                  color: Colors.green,
+                ),
+              ),
+              const Icon(Icons.medical_services, size: 24, color: Colors.green),
+            ],
+          ),
+          const Divider(height: 24, thickness: 1.2),
+
+          // Medicines list
+          if (medicines.isNotEmpty) ...[
+            const Text(
+              "ยาสามัญประจำบ้านที่แนะนำ:",
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
+            ...medicines.map((m) {
+              final name = m["name"] ?? "ชื่อยาไม่ระบุ";
+              final usage = m["usage"] ?? "วิธีใช้ไม่ระบุ";
+              final precautions = m["precautions"] ?? "ข้อควรระวังไม่ระบุ";
+              print("Medicine item: $m");
+
+              return Card(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                   children: [
+                      // Placeholder for medicine image
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: Colors.green[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(
+                            _getMedicineImage(name),     // เลือกรูปตามชื่อยา
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              // ถ้าไม่มีไฟล์รูป ให้ใช้ Icon แทน
+                              return const Icon(Icons.medication, size: 36, color: Colors.green);
+                            },
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 12), 
+
+                      // Medicine info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name ?? "-",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              "วิธีใช้: ${usage ?? "-"}",
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "ข้อควรระวัง: ${precautions ?? "-"}",
+                              style: const TextStyle(fontSize: 13, color: Colors.redAccent),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ] else
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text("ไม่มีข้อมูลยาแนะนำ", style: TextStyle(color: Colors.black54)),
+            ),
+        ],
+      ),
+    ),
   );
 }
+

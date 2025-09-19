@@ -32,7 +32,7 @@ enum ChatSender { user, bot, system, error }
 
 enum EvidenceChoice { present, absent, unknown }
 
-enum MessageType { text, cardEvidence , cardDiagnosis ,cardSuggest, chart }
+enum MessageType { text, cardEvidence , cardDiagnosis , cardSuggest, cardMedicine}
 
 class ChatMessage {
   final String id;
@@ -175,14 +175,8 @@ class InfermedicaService {
             'disable_groups': noGroups,
         }
     }));
-    print('DIAGNOSIS BODY => ${jsonEncode({
-    'age': {'value': age, 'unit': 'year'},
-    'sex': sex,
-    'evidence': evidence.map((e) => e.toJson()).toList(),
-  })}');
 
     final resp = await _client.post(uri, headers: _headers(), body: body);
-    print(resp.body);
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       final Map<String, dynamic> data = jsonDecode(resp.body);
       return DiagnosisResult.fromJson(data);
@@ -203,7 +197,6 @@ class InfermedicaService {
       'evidence': evidence.map((e) => e.toJson()).toList(),
     }));
     final resp = await _client.post(uri, headers: _headers(), body: body);
-    print(resp.body);
 
 
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
@@ -238,6 +231,31 @@ class InfermedicaService {
       };
     } else {
       throw InfermedicaHttpException(resp.statusCode, resp.body);
+    }
+  }
+
+  // ฟังก์ชันหลัก
+  Future<List<Map<String, String>>> getConceptsByIds(List<String> ids) async {
+    final uri = Uri.parse('$infermedicaBaseUrl/concepts');
+
+    // ส่ง request POST พร้อม list ของ ids
+    final body = jsonEncode({'ids': ids});
+
+    final resp = await http.post(uri, headers: _headers(), body: body);
+
+    if (resp.statusCode >= 200 && resp.statusCode < 300) {
+      final List<dynamic> data = jsonDecode(resp.body);
+
+      // map ให้เหลือเฉพาะ id + name
+      return data
+          .map((item) => {
+                'id': item['id'] as String,
+                'name': item['name'] as String,
+              })
+          .toList();
+    } else {
+      throw Exception(
+          'Infermedica API error: ${resp.statusCode} ${resp.body}');
     }
   }
 
@@ -403,8 +421,6 @@ class InfermedicaChatController extends ChangeNotifier {
     sex = userProfile['sex'] ?? defaultSex;
     foodAllergies = userProfile['foodAllergies'] ?? defaultAllergies;
     medicalConditions = userProfile['medicalConditions'] ?? defaultMedicalConditions;
-    print(age);
-    print(sex);
 
     notifyListeners();
   }
@@ -413,6 +429,7 @@ class InfermedicaChatController extends ChangeNotifier {
   final List<EvidenceItem> _evidence = [];
 
   Map<String, dynamic> _evidence_common_name = {};
+  List<Map<String, String>> _evidence_common_name2 = [];
 
   bool _isBusy = false;
   DiagnosisResult? _lastDiagnosis;
@@ -568,7 +585,7 @@ class InfermedicaChatController extends ChangeNotifier {
       );
       _lastDiagnosis = dx;
 
-      if (dx.isFinished || questionCount >= 5) {
+      if (dx.isFinished || questionCount >= 1) {
         final tx = await service.triage(
           evidence: _evidence, 
           age: age, 
@@ -589,6 +606,8 @@ class InfermedicaChatController extends ChangeNotifier {
           sex: sex,
           target: _lastDiagnosis?.conditions.first.id ?? '',);
         print(_evidence_common_name);
+
+        _evidence_common_name2 = await service.getConceptsByIds(_evidence.map((e) => e.id).toList());
 
         final dataEvidence = await _MaptoCardForcardEvidence(updatedDx);
         _messages.add(ChatMessage(
@@ -617,7 +636,16 @@ class InfermedicaChatController extends ChangeNotifier {
           textreuslt: dataselfcare,
           payload: {'diagnosis': updatedDx},
         ));
-        return ;
+
+        print(dataselfcare);
+        _messages.add(ChatMessage(
+          id: const Uuid().v4(), 
+          sender: ChatSender.bot,
+          type: MessageType.cardMedicine,
+          textreuslt: dataselfcare,
+          payload: {'diagnosis': updatedDx},
+        ));
+
       } 
       else {
         // Show follow‑up question.
@@ -644,11 +672,6 @@ class InfermedicaChatController extends ChangeNotifier {
     }
   }
   
-
-  // ---------------------------------------------------------------------------
-  // HELPER TEXT BUILDERS
-  // ---------------------------------------------------------------------------
-
   String _buildQuestionDisplayText(DiagnosisQuestion q) {
     // Example representation for chat.
     // For group questions, items could be multiple; we show bullet list.
@@ -671,46 +694,14 @@ class InfermedicaChatController extends ChangeNotifier {
     return c_thai_List ;
   }
 
-  // Future<String> _buildFinalEvidenceText() async {
-  //   final buf = StringBuffer();
-  //   buf.writeln('ข้อมูลอาการ:');
-
-  //   if (_evidence_common_name.isEmpty) {
-  //     buf.writeln('- ไม่มีข้อมูลอาการ/ปัจจัยเสี่ยง');
-  //   } else {
-  //     // loop แต่ละประเภท evidence
-  //     final Map<String, dynamic> evidences = _evidence_common_name;
-
-  //     // supporting = +
-  //     for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
-  //       buf.writeln('- ${e['common_name']}: +');
-  //     }
-
-  //     // conflicting = -
-  //     for (final e in List<Map<String, dynamic>>.from(evidences['conflicting_evidence'] ?? [])) {
-  //       buf.writeln('- ${e['common_name']}: -');
-  //     }
-
-  //     // unconfirmed = ?
-  //     for (final e in List<Map<String, dynamic>>.from(evidences['unconfirmed_evidence'] ?? [])) {
-  //       buf.writeln('- ${e['common_name']}: ?');
-  //     }
-  //   }
-
-  //   buf.writeln('\n(นี่คือข้อมูลที่ใช้ในการประเมินอัตโนมัติ)');
-  //   return buf.toString().trim();
-  // }
-
   Future<Map<String, dynamic >> _MaptoCardForcardEvidence (DiagnosisResult dx) async{
-    print(_evidence);
-    print(_evidence_common_name);
+    print(_evidence_common_name2);
     return {
       'title' : "ข้อมูลอาการ",
-      'evidences': _evidence_common_name,
+      'evidences': _evidence_common_name2,
     };
   }
   
-
   Future<Map<String, dynamic >> _MaptoCardForcardDiagnosis (DiagnosisResult dx) async{
     List c_thai_List = await collect_conditions_name(dx);
     return {
@@ -744,55 +735,46 @@ class InfermedicaChatController extends ChangeNotifier {
         .replaceAll("```json", "")
         .replaceAll("```", "")
         .trim();
-  print(cleaned);
     final Map<String, dynamic> parsed = jsonDecode(cleaned);
 
     return {
-      'title': "คำแนะนำ",
+      'title_suggest': "คำแนะนำ",
       'triage_level': parsed['triage_level'] ?? "-",
       'advice_list': parsed['advice_list'] ?? [],
+      'title_medicine': "คำแนะนำการใช้ยา",
+      'medicine_list': parsed['medicine_list'] ?? [],
     };
   } catch (e) {
     print("JSON parse error: $e");
     return {
-      'title': "คำแนะนำ",
+      'title_suggest': "คำแนะนำ",
       'triage_level': "-",
       'advice_list': [],
+      'title_medicine' : "",
+      'medicine_list': [],
     };
   }
 }
 
-
-
-  // ---------------------------------------------------------------------------
-  // USER QUICK ANSWER MAPPING yes/no/maybe -> EvidenceChoice
-  // ---------------------------------------------------------------------------
-
   Future<EvidenceChoice?> _mapUserQuickAnswer(String text) async{
     final lastChatMessage = _messages.last;
     final lastQuestionText = lastChatMessage.text; 
-    print("----------------------------------------------------");
-    print(lastQuestionText);
 
-    final t = text.trim().toLowerCase();
-    if (['y', 'yes', 'ใช่', 'มี', 'present', 'true', '1'].contains(t)) {
-      return EvidenceChoice.present;
-    }
-    if (['n', 'no', 'ไม่', 'ไม่มี', 'absent', 'false', '0'].contains(t)) {
-      return EvidenceChoice.absent;
-    }
-    if (['m', 'maybe', 'ไม่แน่ใจ', 'unknown', 'ไม่ทราบ' , 'อาจจะ'].contains(t)) {
-      return EvidenceChoice.unknown;
-    }
+    final prompt = """ จัดประเภทข้อความที่ผู้ใช้ป้อนว่าเป็นหนึ่งในคำสำคัญสำหรับ Infermedica EvidenceChoice ตามความหมาย:
+      - ถ้าข้อความแสดงถึงความหมายเชิงบวกหรือการยืนยัน และเหมาะสมกับกรอบคำถาม ให้ตอบด้วย "present".
+      - ถ้าข้อความแสดงถึงความหมายเชิงลบ การปฏิเสธ หรือไม่เหมาะสมกับกรอบคำถาม ให้ตอบด้วย "absent".
+      - ถ้าข้อความแสดงถึงความไม่แน่ใจ ความสงสัย หรือไม่เกี่ยวข้องกับคำถามเลย ให้ตอบด้วย "unknown".
 
-    final prompt = """ Classify the user input as one of these keywords for Infermedica EvidenceChoice based on its meaning:
-      - If the input expresses a positive or affirmative meaning, respond with "present".
-      - If the input expresses a negative or denial meaning, respond with "absent".
-      - If the input expresses uncertainty or doubt, respond with "unknown".
+      ตัวอย่าง:
+      - คำถาม: "คุณมีไข้ 37-38 องศาใช่หรือไม่?" → ผู้ใช้ตอบ "37.5" ถือว่า present.
+      - คำถามเดียวกัน → ผู้ใช้ตอบ "35" ถือว่า absent.
+      - คำถามเดียวกัน → ผู้ใช้ตอบ "dwasdkopj" หรือ "อาการดีอยู่" ถือว่า unknown.
 
-      Only output the exact keyword: present, absent, or unknown.
-      Last question asked to user: $lastQuestionText
-      User input: $text """;
+      แสดงผลลัพธ์เป็นเพียงคำสำคัญเท่านั้น: present, absent, หรือ unknown.
+      คำถามล่าสุดที่ถามผู้ใช้: $lastQuestionText
+      ข้อความที่ผู้ใช้ป้อน: $text """;
+
+
 
       final body = jsonEncode({
         "contents": [
@@ -839,4 +821,18 @@ class InfermedicaChatController extends ChangeNotifier {
     return null;
   }
   }
+
+  Future<void> saveMessagesToFirebase() async {
+    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+
+    for (var message in _messages) {
+      await firestore.collection('chats').doc(message.id).set(
+        message.toMap(),
+        SetOptions(merge: true),
+      );
+    }
+  }
+
 }
+
+
