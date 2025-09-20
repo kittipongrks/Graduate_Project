@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:dahcpplication/controller/gemini_generate.dart';
 import 'package:dahcpplication/auth/database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // -----------------------------------------------------------------------------
 // CONFIG
@@ -41,7 +42,6 @@ class ChatMessage {
   final String? text;
   final Map<String, dynamic>? textreuslt;
   final Timestamp timestamp;
-  final dynamic payload; // optional structured info (e.g., question, conditions)
 
 
   ChatMessage({
@@ -51,18 +51,16 @@ class ChatMessage {
     this.text,
     this.textreuslt,
     Timestamp? timestamp,
-    this.payload,
   }) : timestamp = timestamp ?? Timestamp.now();
 
   //Maping Chatsender to String for display
   Map<String , dynamic> toMap(){
     return {
       'senderID': id,
-      'sender': sender,
+      'sender': sender.name,
       'type': type.name,
       'text': text,
-      'textreuslt': textreuslt,
-      'payload' : payload,
+      'textreuslt': textreuslt ?? {},
       'timestamp': timestamp,
     };
   }
@@ -74,8 +72,9 @@ class EvidenceItem {
   final String id; // symptom or risk factor ID from Infermedica
   final EvidenceChoice choice;
   final String? source; // 'initial', 'user', 'question', etc.
+  final String? common_name;
 
-  EvidenceItem({required this.id, required this.choice ,this.source});
+  EvidenceItem({required this.id, required this.choice ,this.source , this.common_name});
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -93,6 +92,7 @@ class EvidenceItem {
         return 'unknown';
     }
   }
+  
 }
 
 
@@ -234,14 +234,14 @@ class InfermedicaService {
     }
   }
 
-  // ฟังก์ชันหลัก
-  Future<List<Map<String, String>>> getConceptsByIds(List<String> ids) async {
-    final uri = Uri.parse('$infermedicaBaseUrl/concepts');
+  /// https://api.infermedica.com/v3/concepts?ids=c_1,c_4
+  Future<List<Map<String, dynamic>>> getConceptsByIds(
+    List<String> ids
+    ) async {
+    final idToString = ids.join(',');
+    final uri = Uri.parse('$infermedicaBaseUrl/concepts/?ids=$idToString');
 
-    // ส่ง request POST พร้อม list ของ ids
-    final body = jsonEncode({'ids': ids});
-
-    final resp = await http.post(uri, headers: _headers(), body: body);
+    final resp = await http.get(uri, headers: _headers());
 
     if (resp.statusCode >= 200 && resp.statusCode < 300) {
       final List<dynamic> data = jsonDecode(resp.body);
@@ -251,6 +251,7 @@ class InfermedicaService {
           .map((item) => {
                 'id': item['id'] as String,
                 'name': item['name'] as String,
+                'common_name': item['common_name'] as String? ?? item['name'] as String,
               })
           .toList();
     } else {
@@ -260,9 +261,6 @@ class InfermedicaService {
   }
 
 }
-
-
-
 class InfermedicaHttpException implements Exception {
   final int statusCode;
   final String body;
@@ -395,12 +393,14 @@ class DiagnosisResult {
 class InfermedicaChatController extends ChangeNotifier {
   InfermedicaChatController({
     required this.service,
+    String? UserId,
     int? age,
     String? sex,
     String? caseId,
     String? foodAllergies,
     String? medicalConditions,
-  })  : age = age ?? defaultAge,
+  })  : UserId = UserId ?? '',
+        age = age ?? defaultAge,
         sex = sex ?? defaultSex,
         foodAllergies = foodAllergies ?? defaultAllergies,
         medicalConditions = medicalConditions ?? defaultMedicalConditions,
@@ -412,11 +412,13 @@ class InfermedicaChatController extends ChangeNotifier {
   String sex;
   String foodAllergies;
   String medicalConditions;
+  String UserId;
   final String caseId;
 
   Future<void> loadUserData() async {
     final userProfile = await fetchUserInfo();
-
+    final user = FirebaseAuth.instance.currentUser;
+    UserId = user?.uid ?? '';
     age = userProfile['age'] ?? defaultAge;
     sex = userProfile['sex'] ?? defaultSex;
     foodAllergies = userProfile['foodAllergies'] ?? defaultAllergies;
@@ -429,7 +431,6 @@ class InfermedicaChatController extends ChangeNotifier {
   final List<EvidenceItem> _evidence = [];
 
   Map<String, dynamic> _evidence_common_name = {};
-  List<Map<String, String>> _evidence_common_name2 = [];
 
   bool _isBusy = false;
   DiagnosisResult? _lastDiagnosis;
@@ -555,7 +556,6 @@ class InfermedicaChatController extends ChangeNotifier {
           sender: ChatSender.bot,
           type: MessageType.text,
           text: "ฉันไม่พบอาการจากข้อความนั้น คุณช่วยอธิบายเพิ่มเติมได้ไหม?", // Thai
-          payload: {'type': 'no_mentions'},
         ));
         notifyListeners();
       } else {
@@ -598,16 +598,6 @@ class InfermedicaChatController extends ChangeNotifier {
           triage: tx,
         );
         _lastDiagnosis = updatedDx;
-        
-
-        _evidence_common_name = await service.explain(
-          evidence: _evidence,
-          age: age,
-          sex: sex,
-          target: _lastDiagnosis?.conditions.first.id ?? '',);
-        print(_evidence_common_name);
-
-        _evidence_common_name2 = await service.getConceptsByIds(_evidence.map((e) => e.id).toList());
 
         final dataEvidence = await _MaptoCardForcardEvidence(updatedDx);
         _messages.add(ChatMessage(
@@ -625,8 +615,8 @@ class InfermedicaChatController extends ChangeNotifier {
           sender: ChatSender.bot,
           type: MessageType.cardDiagnosis,
           textreuslt: dataDiagnosis,
-          payload: {'diagnosis': updatedDx},
         ));
+
 
         final dataselfcare = await _MaptoCardForcardSuggest(updatedDx);
         _messages.add(ChatMessage(
@@ -634,17 +624,38 @@ class InfermedicaChatController extends ChangeNotifier {
           sender: ChatSender.bot,
           type: MessageType.cardSuggest,
           textreuslt: dataselfcare,
-          payload: {'diagnosis': updatedDx},
         ));
-
-        print(dataselfcare);
         _messages.add(ChatMessage(
           id: const Uuid().v4(), 
           sender: ChatSender.bot,
           type: MessageType.cardMedicine,
           textreuslt: dataselfcare,
-          payload: {'diagnosis': updatedDx},
         ));
+
+
+        print("create card success");
+
+        final resultRef = FirebaseFirestore.instance.collection('messages').doc();
+        print("create new document with ID: ${resultRef.id} success");
+
+        // แปลง _messages เป็น list ของ Map ด้วย toMap()
+        final messageMaps = _messages.map((msg) {
+          return {
+            'id': msg.id,
+            'type': msg.type.name,     
+            'textreuslt': msg.textreuslt ?? {}, // Map หรือ default {}
+          };
+        }).toList();
+        print("transform _messages to Map success");
+
+        await resultRef.set({
+          'userId': UserId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'result': messageMaps,
+        });
+
+        print('Saved result to Firestore with ID: ${resultRef.id}');
+
 
       } 
       else {
@@ -657,7 +668,6 @@ class InfermedicaChatController extends ChangeNotifier {
           sender: ChatSender.bot,
           type: MessageType.text,
           text: qTextTh,
-          payload: {'question': dx.question},
         ));
         questionCount++;
       }
@@ -695,10 +705,10 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic >> _MaptoCardForcardEvidence (DiagnosisResult dx) async{
-    print(_evidence_common_name2);
+    print(_evidence_common_name);
     return {
       'title' : "ข้อมูลอาการ",
-      'evidences': _evidence_common_name2,
+      'evidences': _evidence_common_name,
     };
   }
   
