@@ -33,16 +33,13 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
   }
 
   Future<void> loadUserInfo() async {
-    print("try to load userinfo");
     final document = await fetchUserInfo();
     if (document != null) {
       age = document['age'];
       sex = document['sex'];
       foodAllergies = document['foodAllergies'];
       medicalConditions = document['medicalConditions'];
-      print("load UserInfo success: $age, $sex, $foodAllergies, $medicalConditions");
     } else {
-      print("No user data found, using default values.");
       age = defaultAge;
       sex = defaultSex;
     }
@@ -120,17 +117,15 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
           width: double.maxFinite,
           child: GridView.count(
             shrinkWrap: true,
-            crossAxisCount: 3, // 3 คอลัมน์
+            crossAxisCount: 2, // 3 คอลัมน์
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
             children: [
               _buildFunctionButton(Icons.refresh, 'แชทใหม่', () {
+                _controller?.resetChat();
                 Navigator.pop(context);
               }),
               _buildFunctionButton(Icons.history, 'ประวัติ', () {
-                Navigator.pop(context);
-              }),
-              _buildFunctionButton(Icons.save, 'บันทึกแชท', () async{
                 Navigator.pop(context);
               }),
               _buildFunctionButton(Icons.person, 'โปรไฟล์', () {
@@ -139,9 +134,6 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
                   context,
                   MaterialPageRoute(builder: (context) => const AccountPage()),
                 );
-              }),
-              _buildFunctionButton(Icons.settings, 'ตั้งค่า', () {
-                Navigator.pop(context);
               }),
               _buildFunctionButton(Icons.exit_to_app, 'ออกระบบ', (){
                 Navigator.pop(context);
@@ -441,13 +433,12 @@ Widget _buildFunctionButton(IconData icon, String label, VoidCallback onTap) {
   }
  
 Widget _buildCardMessageEvidence(Map<String, dynamic> data) {
-  final evidences = data['evidences'] as Map<String, dynamic>? ?? {};
-  final supporting =
-      List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? []);
-  final conflicting =
-      List<Map<String, dynamic>>.from(evidences['conflicting_evidence'] ?? []);
-  final unconfirmed =
-      List<Map<String, dynamic>>.from(evidences['unconfirmed_evidence'] ?? []);
+  final evidences = (data['evidences'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+
+  // แยกตาม choice
+  final supporting = evidences.where((e) => e["choice"] == "present").toList();
+  final conflicting = evidences.where((e) => e["choice"] == "absent").toList();
+  final unconfirmed = evidences.where((e) => e["choice"] == "unknown").toList();
 
   return Card(
     shape: RoundedRectangleBorder(
@@ -475,11 +466,10 @@ Widget _buildCardMessageEvidence(Map<String, dynamic> data) {
             ],
           ),
           const SizedBox(height: 16),
+          const Divider(),
 
           // Supporting evidence
           if (supporting.isNotEmpty) ...[
-            const Text("อาการ/ปัจจัยที่สนับสนุน (+):",
-                style: TextStyle(color: Colors.black54, fontSize: 14)),
             const SizedBox(height: 8),
             ...supporting.map((e) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
@@ -500,9 +490,6 @@ Widget _buildCardMessageEvidence(Map<String, dynamic> data) {
 
           // Conflicting evidence
           if (conflicting.isNotEmpty) ...[
-            const Text("อาการ/ปัจจัยที่ขัดแย้ง (-):",
-                style: TextStyle(color: Colors.black54, fontSize: 14)),
-            const SizedBox(height: 8),
             ...conflicting.map((e) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
@@ -522,9 +509,6 @@ Widget _buildCardMessageEvidence(Map<String, dynamic> data) {
 
           // Unconfirmed evidence
           if (unconfirmed.isNotEmpty) ...[
-            const Text("อาการ/ปัจจัยที่ยังไม่ยืนยัน (?):",
-                style: TextStyle(color: Colors.black54, fontSize: 14)),
-            const SizedBox(height: 8),
             ...unconfirmed.map((e) => Padding(
                   padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
@@ -552,6 +536,7 @@ Widget _buildCardMessageEvidence(Map<String, dynamic> data) {
     ),
   );
 }
+
 
 Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
   final conditions = (data['conditions'] as List?) ?? [];
@@ -674,6 +659,11 @@ Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
               ],
             ),
           ],
+          const Divider(),
+          const Text(
+            "(นี่คือข้อมูลที่ได้จาก Infermedica)",
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
         ],
       ),
     ),
@@ -712,6 +702,7 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
                     size: 26, color: Colors.redAccent),
               ],
             ),
+            const SizedBox(height: 20),
             const Divider(height: 24, thickness: 1.2),
             const Text(
               "กรุณาไปพบแพทย์ฉุกเฉินทันที",
@@ -805,7 +796,14 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
               "ไม่มีคำแนะนำเพิ่มเติม",
               style: TextStyle(color: Colors.black54),
             ),
+          const SizedBox(height: 20),
+          const Divider(),
+          const Text(
+            "(นี่คือข้อมูลที่ได้จาก AI)",
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
         ],
+        
       ),
     ),
   );
@@ -865,8 +863,6 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
               final name = m["name"] ?? "ชื่อยาไม่ระบุ";
               final usage = m["usage"] ?? "วิธีใช้ไม่ระบุ";
               final precautions = m["precautions"] ?? "ข้อควรระวังไม่ระบุ";
-              print("Medicine item: $m");
-
               return Card(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -927,6 +923,7 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
                         ),
                       ),
                     ],
+                    
                   ),
                 ),
               );
@@ -936,7 +933,14 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Text("ไม่มีข้อมูลยาแนะนำ", style: TextStyle(color: Colors.black54)),
             ),
+        const SizedBox(height: 20),
+        const Divider(),
+          const Text(
+            "(นี่คือข้อมูลที่ได้จาก AI)",
+            style: TextStyle(fontSize: 12, color: Colors.black54),
+          ),
         ],
+        
       ),
     ),
   );

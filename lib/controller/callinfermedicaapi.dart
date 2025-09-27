@@ -235,9 +235,7 @@ class InfermedicaService {
   }
 
   /// https://api.infermedica.com/v3/concepts?ids=c_1,c_4
-  Future<List<Map<String, dynamic>>> getConceptsByIds(
-    List<String> ids
-    ) async {
+  Future<List<Map<String, dynamic>>> getConceptsByIds(List<String> ids) async {
     final idToString = ids.join(',');
     final uri = Uri.parse('$infermedicaBaseUrl/concepts/?ids=$idToString');
 
@@ -391,6 +389,15 @@ class DiagnosisResult {
 // -----------------------------------------------------------------------------
 
 class InfermedicaChatController extends ChangeNotifier {
+
+  Future<void> resetChat() async {
+    await service.new_case_id(); // Generate a new case_id
+    _messages.clear();
+    _evidence.clear();
+    addSystemMessage('สวัสดีอีกครั้ง!');
+    addSystemMessage('อยากเล่าอะไรให้ฟังไหมเกี่ยวกับอาการของคุณ');
+    notifyListeners();
+  }
   InfermedicaChatController({
     required this.service,
     String? UserId,
@@ -417,8 +424,7 @@ class InfermedicaChatController extends ChangeNotifier {
 
   Future<void> loadUserData() async {
     final userProfile = await fetchUserInfo();
-    final user = FirebaseAuth.instance.currentUser;
-    UserId = user?.uid ?? '';
+    UserId = userProfile.uid ;
     age = userProfile['age'] ?? defaultAge;
     sex = userProfile['sex'] ?? defaultSex;
     foodAllergies = userProfile['foodAllergies'] ?? defaultAllergies;
@@ -428,7 +434,7 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   final List<ChatMessage> _messages = [];
-  final List<EvidenceItem> _evidence = [];
+  List<EvidenceItem> _evidence = [];
 
   Map<String, dynamic> _evidence_common_name = {};
 
@@ -442,7 +448,6 @@ class InfermedicaChatController extends ChangeNotifier {
   DiagnosisResult? get lastDiagnosis => _lastDiagnosis;
 
   void addSystemMessage(String text) {
-  bool _isLoading = true;
   notifyListeners();
   Future.delayed(Duration(seconds: 1), () { 
     _messages.add(ChatMessage(
@@ -451,7 +456,6 @@ class InfermedicaChatController extends ChangeNotifier {
       type: MessageType.text,
       text: text
       ));
-    _isLoading = false; // Hide loading indicator after delay
     notifyListeners();
   });
 }
@@ -540,6 +544,9 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   Future<void> _runParseThenDiagnosis(String processedUserText) async {
+    if (questionCount > 1){
+      return;
+    }
     _isBusy = true;
     notifyListeners();
     processedUserText = await llmsChangeThaiToEng(processedUserText);
@@ -585,7 +592,7 @@ class InfermedicaChatController extends ChangeNotifier {
       );
       _lastDiagnosis = dx;
 
-      if (dx.isFinished || questionCount >= 1) {
+      if (dx.isFinished || questionCount >= 10) {
         final tx = await service.triage(
           evidence: _evidence, 
           age: age, 
@@ -631,31 +638,8 @@ class InfermedicaChatController extends ChangeNotifier {
           type: MessageType.cardMedicine,
           textreuslt: dataselfcare,
         ));
-
-
-        print("create card success");
-
-        final resultRef = FirebaseFirestore.instance.collection('messages').doc();
-        print("create new document with ID: ${resultRef.id} success");
-
-        // แปลง _messages เป็น list ของ Map ด้วย toMap()
-        final messageMaps = _messages.map((msg) {
-          return {
-            'id': msg.id,
-            'type': msg.type.name,     
-            'textreuslt': msg.textreuslt ?? {}, // Map หรือ default {}
-          };
-        }).toList();
-        print("transform _messages to Map success");
-
-        await resultRef.set({
-          'userId': UserId,
-          'createdAt': FieldValue.serverTimestamp(),
-          'result': messageMaps,
-        });
-
-        print('Saved result to Firestore with ID: ${resultRef.id}');
-
+        
+        saveMessagesToFirebase();
 
       } 
       else {
@@ -704,13 +688,45 @@ class InfermedicaChatController extends ChangeNotifier {
     return c_thai_List ;
   }
 
-  Future<Map<String, dynamic >> _MaptoCardForcardEvidence (DiagnosisResult dx) async{
-    print(_evidence_common_name);
-    return {
-      'title' : "ข้อมูลอาการ",
-      'evidences': _evidence_common_name,
+  Future<Map<String, dynamic>> _MaptoCardForcardEvidence(DiagnosisResult dx) async {
+    // ดึงข้อมูล concepts จาก service
+    final concepts = await service.getConceptsByIds(
+      _evidence.map((e) => e.id).toList(),
+    );
+
+    // สร้าง Map <id, common_name>
+    final Map<String, String> commonNameMap = {
+      for (final concept in concepts)
+        concept['id']: concept['common_name'] ?? concept['name'],
     };
+
+    // อัปเดต EvidenceItem แต่ละตัวให้มี common_name
+    _evidence = _evidence.map((e) {
+      return EvidenceItem(
+        id: e.id,
+        choice: e.choice,
+        source: e.source,
+        common_name: commonNameMap[e.id],
+      );
+    }).toList();
+
+    // Debug print
+    for (var e in _evidence) {
+      print("id=${e.id}, choice=${e.choice}, common_name=${e.common_name}");
+    }
+
+    // สร้าง data สำหรับ card
+    return {
+      'title': "ข้อมูลอาการ",
+      'evidences': _evidence.map((e) => {
+        'id': e.id,
+        'common_name': e.common_name ?? e.id,
+        'choice': EvidenceItem._choiceToString(e.choice),
+      }).toList(),
+    };
+
   }
+
   
   Future<Map<String, dynamic >> _MaptoCardForcardDiagnosis (DiagnosisResult dx) async{
     List c_thai_List = await collect_conditions_name(dx);
@@ -729,42 +745,57 @@ class InfermedicaChatController extends ChangeNotifier {
     };
   }
 
-  Future<Map<String , dynamic>> _MaptoCardForcardSuggest(DiagnosisResult dx) async {
-  final something = await self_care_suggestion(
-    dx, 
-    age, 
-    sex,
-    medicalConditions, 
-    foodAllergies, 
-    _evidence_common_name,
-  );
+  Future<Map<String, dynamic>> _MaptoCardForcardSuggest(DiagnosisResult dx) async {
+    // แปลง _evidence เป็น Map ที่ self_care_suggestion ต้องการ
+    final List evidences = _evidence.map((e) => {
+      'id': e.id,
+      'common_name': e.common_name ?? e.id,
+      'choice': EvidenceItem._choiceToString(e.choice),
+    }).toList();
 
-  try {
-    // 🔹 ตัด ```json และ ``` ออก
-    String cleaned = something
-        .replaceAll("```json", "")
-        .replaceAll("```", "")
-        .trim();
-    final Map<String, dynamic> parsed = jsonDecode(cleaned);
+    final Map<String, dynamic> preparedData = {
+      'title': "ข้อมูลอาการ",
+      'evidences': evidences,
+    };
 
-    return {
-      'title_suggest': "คำแนะนำ",
-      'triage_level': parsed['triage_level'] ?? "-",
-      'advice_list': parsed['advice_list'] ?? [],
-      'title_medicine': "คำแนะนำการใช้ยา",
-      'medicine_list': parsed['medicine_list'] ?? [],
-    };
-  } catch (e) {
-    print("JSON parse error: $e");
-    return {
-      'title_suggest': "คำแนะนำ",
-      'triage_level': "-",
-      'advice_list': [],
-      'title_medicine' : "",
-      'medicine_list': [],
-    };
+    // เรียก self_care_suggestion พร้อมส่ง preparedData
+    final result = await self_care_suggestion(
+      dx,
+      age,
+      sex,
+      medicalConditions,
+      foodAllergies,
+      preparedData,
+    );
+
+    try {
+      // 🔹 ตัด ```json และ ``` ออก (ถ้า needed)
+      String cleaned = result
+          .toString()
+          .replaceAll("```json", "")
+          .replaceAll("```", "")
+          .trim();
+      final Map<String, dynamic> parsed = jsonDecode(cleaned);
+
+      return {
+        'title_suggest': "คำแนะนำ",
+        'triage_level': parsed['triage_level'] ?? "-",
+        'advice_list': parsed['advice_list'] ?? [],
+        'title_medicine': "คำแนะนำการใช้ยา",
+        'medicine_list': parsed['medicine_list'] ?? [],
+      };
+    } catch (e) {
+      print("JSON parse error: $e");
+      return {
+        'title_suggest': "คำแนะนำ",
+        'triage_level': "-",
+        'advice_list': [],
+        'title_medicine' : "",
+        'medicine_list': [],
+      };
+    }
   }
-}
+
 
   Future<EvidenceChoice?> _mapUserQuickAnswer(String text) async{
     final lastChatMessage = _messages.last;
@@ -833,14 +864,28 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   Future<void> saveMessagesToFirebase() async {
-    final FirebaseFirestore firestore = FirebaseFirestore.instance;
+    final resultRef = FirebaseFirestore.instance.collection('messages').doc();
+        print("create new document with ID: ${resultRef.id} success");
 
-    for (var message in _messages) {
-      await firestore.collection('chats').doc(message.id).set(
-        message.toMap(),
-        SetOptions(merge: true),
-      );
-    }
+        // แปลง _messages เป็น list ของ Map ด้วย toMap()
+        final messageMaps = _messages.map((msg) {
+          return {
+            'id': msg.id,
+            'sender':msg.sender,
+            'type': msg.type.name,
+            'text': msg.text ?? '',
+            'textreuslt': msg.textreuslt ?? {},
+          };
+        }).toList();
+        print("transform _messages to Map success");
+
+        await resultRef.set({
+          'userId': UserId,
+          'createdAt': FieldValue.serverTimestamp(),
+          'result': messageMaps,
+        });
+
+        print('Saved result to Firestore with ID: ${resultRef.id}');
   }
 
 }

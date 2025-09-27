@@ -197,57 +197,66 @@ Future<String> Terminology_medical_translate(String prompt) async{
   }
 }
 
-Future<dynamic> self_care_suggestion(DiagnosisResult dx,int age, String gender ,String medicalConditions , String foodAllergies , _evidence_common_name)async{
-  final Map<String, dynamic> evidences = _evidence_common_name;
-    String symptom = '';
-    for (final e in List<Map<String, dynamic>>.from(evidences['supporting_evidence'] ?? [])) {
-      symptom = symptom + e['common_name'] ;
-      if (e['common_name'].isNotEmpty) {
-        symptom += ', ';
-      }
-      
-    }
-  final prompt = """ "คุณคือผู้ช่วยสร้างคำแนะนำด้านสุขภาพ ช่วยสร้างคำแนะนำจากข้อมูลผู้ป่วยที่ให้มา 
-  โดยผลลัพธ์ต้องอยู่ในรูปแบบ JSON object เท่านั้น และมี key และ value ดังนี้: `triage_level` สำหรับระดับความรุนแรง, 
-  `advice_title` สำหรับหัวข้อหลัก, และ `advice_list` 
-  สำหรับรายการคำแนะนำเป็นข้อๆ โดยแต่ละข้อมี `topic` และ `content` ตามข้อมูลด้านล่างนี้
-  
-    โดยข้อมูลยาที่แนะนำจะต้องเป็นยาที่สามารถซื้อได้โดยไม่ต้องมีใบสั่งแพทย์ (OTC) 
-    และควรระบุชื่อยาที่เป็นที่รู้จักในท้องตลาดหรือก็คือข้อมูลยาสามัญประจำบ้านปี 2568
-    โดยให้บอกชื่อยาที่คนทั่วไปรู้จัก วิธีใช้แบบย่อๆ ให้ผู้ใช้เข้าใจง่าย",
-  "data": {
-    "triage_level": "${dx.triage!.level}",
-    "patient_info": {
-      "age": $age,
-      "sex": "$gender",
-      "symptoms": ["${symptom}"],
-      "allergies": {
-        "medical_conditions": ["${medicalConditions}"],
-        "food_allergies": ["${foodAllergies}"]
-      }
-    }
-  },
+Future<dynamic> self_care_suggestion(
+  DiagnosisResult dx,
+  int age,
+  String gender,
+  String medicalConditions,
+  String foodAllergies,
+  Map<String, dynamic> preparedEvidence, // ได้จาก _MaptoCardForcardSuggest
+) async {
+  final List evidences = preparedEvidence['evidences'] ?? [];
 
-  "output_format": {
-    "triage_level": "string",
-    "advice_title": "string",
-    "advice_list": [
-      {
-        "topic": "การดูแลตัวเองเบื้องต้น",
-        "content": ["string", "string"],
-        "topic": "คำแนะนำเพิ่มเติม/ข้อควรระวัง",
-        "content": ["string", "string"],
-      }
-    ],
-    "medicine_list": [
-      {
-        "name": "string",
-        "usage": "string",
-        "precautions": "string"
-      }
-    ]
+  // รวมเฉพาะอาการ present
+  String symptom = evidences
+      .where((e) => e['choice'] == 'present')
+      .map((e) => e['common_name'] ?? e['id'])
+      .join(', ');
+
+  print("Present symptoms: $symptom");
+
+  final prompt = """ 
+"คุณคือผู้ช่วยสร้างคำแนะนำด้านสุขภาพ ช่วยสร้างคำแนะนำจากข้อมูลผู้ป่วยที่ให้มา 
+โดยผลลัพธ์ต้องอยู่ในรูปแบบ JSON object เท่านั้น และมี key และ value ดังนี้: `triage_level` สำหรับระดับความรุนแรง, 
+`advice_title` สำหรับหัวข้อหลัก, และ `advice_list` สำหรับรายการคำแนะนำเป็นข้อๆ โดยแต่ละข้อมี `topic` และ `content` ตามข้อมูลด้านล่างนี้
+
+โดยข้อมูลยาที่แนะนำจะต้องเป็นยาที่สามารถซื้อได้โดยไม่ต้องมีใบสั่งแพทย์ (OTC) 
+และควรระบุชื่อยาที่เป็นที่รู้จักในท้องตลาดหรือก็คือข้อมูลยาสามัญประจำบ้านปี 2568
+โดยให้บอกชื่อยาที่คนทั่วไปรู้จัก วิธีใช้แบบย่อๆ ให้ผู้ใช้เข้าใจง่าย",
+
+"data": {
+  "triage_level": "${dx.triage?.level ?? "-"}",
+  "patient_info": {
+    "age": $age,
+    "sex": "$gender",
+    "symptoms": ["$symptom"],
+    "allergies": {
+      "medical_conditions": ["$medicalConditions"],
+      "food_allergies": ["$foodAllergies"]
+    }
   }
-    """;
+},
+
+"output_format": {
+  "triage_level": "string",
+  "advice_title": "string",
+  "advice_list": [
+    {
+      "topic": "การดูแลตัวเองเบื้องต้น",
+      "content": ["string", "string"],
+      "topic": "คำแนะนำเพิ่มเติม/ข้อควรระวัง",
+      "content": ["string", "string"]
+    }
+  ],
+  "medicine_list": [
+    {
+      "name": "string",
+      "usage": "string",
+      "precautions": "string"
+    }
+  ]
+}
+""";
 
   final body = jsonEncode({
     "contents": [
@@ -258,11 +267,13 @@ Future<dynamic> self_care_suggestion(DiagnosisResult dx,int age, String gender ,
       }
     ],
   });
+
   final response = await http.post(
     Uri.parse(endpoint),
     headers: headers,
     body: body,
   );
+
   final dataEngtoThai = jsonDecode(response.body);
 
   if (response.statusCode == 200 && dataEngtoThai['candidates'] != null) {
@@ -277,4 +288,5 @@ Future<dynamic> self_care_suggestion(DiagnosisResult dx,int age, String gender ,
   } else {
     return 'เกิดข้อผิดพลาด: ไม่พบ candidates ใน response\n${response.body}';
   }
-} 
+}
+

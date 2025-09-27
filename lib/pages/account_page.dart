@@ -68,7 +68,6 @@ class _AccountPageState extends State<AccountPage>{
 Future<dynamic> LoadUserInfo() async {
   final user = _auth.currentUser;
   if (user == null) {
-    print("ยังไม่ได้ login");
     return;
   }
   final doc = await _firestore.collection('Users').doc(user.uid).get();
@@ -103,7 +102,6 @@ Future<dynamic> LoadUserInfo() async {
         );
       }
     } catch (e) {
-      print("Error updating user data: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('เกิดข้อผิดพลาดในการบันทึกข้อมูล')),
       );
