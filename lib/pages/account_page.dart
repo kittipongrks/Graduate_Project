@@ -108,8 +108,6 @@ Future<dynamic> LoadUserInfo() async {
     }
   }
 
-  
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
