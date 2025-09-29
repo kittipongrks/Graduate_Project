@@ -1,4 +1,3 @@
-import 'package:dahcpplication/pages/chat_page.dart';
 import 'package:dahcpplication/pages/chat_diagnosis_page.dart';
 import 'package:flutter/material.dart';
 import 'package:dahcpplication/auth/database.dart';

@@ -21,7 +21,6 @@ class _NavigationMenu extends State<NavigationMenu> {
   final List<Widget> _pages = [
     ChatDiagnosisPage(),
     ChatDiagnosisPage(),
-    MyMapPage(),
     AccountPage(),
     
   ];

@@ -22,7 +22,7 @@ const int defaultAge = 30; // ตัวอย่าง
 const String defaultSex = 'male'; // 'male' | 'female'
 const String defaultAllergies = '';
 const String defaultMedicalConditions = '';
-
+int questionCount = 0;
 
 
 // -----------------------------------------------------------------------------
@@ -391,11 +391,13 @@ class DiagnosisResult {
 class InfermedicaChatController extends ChangeNotifier {
 
   Future<void> resetChat() async {
+    questionCount = 0;
     await service.new_case_id(); // Generate a new case_id
     _messages.clear();
     _evidence.clear();
-    addSystemMessage('สวัสดีอีกครั้ง!');
-    addSystemMessage('อยากเล่าอะไรให้ฟังไหมเกี่ยวกับอาการของคุณ');
+    _lastDiagnosis = null;
+    addSystemMessage('สวัสดี!');
+    addSystemMessage('มีอาการอะไรเล่ามาได้เลยครับ');
     notifyListeners();
   }
   InfermedicaChatController({
@@ -441,7 +443,6 @@ class InfermedicaChatController extends ChangeNotifier {
   bool _isBusy = false;
   DiagnosisResult? _lastDiagnosis;
 
-  int questionCount = 0;
 
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get isBusy => _isBusy;
@@ -466,13 +467,6 @@ class InfermedicaChatController extends ChangeNotifier {
       sender: ChatSender.error, 
       type: MessageType.text,
       text: text));
-    notifyListeners();
-  }
-
-  Future<void> startNewCase() async {
-    await service.new_case_id();
-    _evidence.clear();
-    _lastDiagnosis = null;
     notifyListeners();
   }
 
@@ -518,13 +512,6 @@ class InfermedicaChatController extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   Future<String> _preProcessUserText(String input) async {
-    // TODO: implement your custom logic here.
-    // Examples:
-    // - Trim whitespace
-    // - Language translation to English if needed
-    // - Remove emojis / slang normalization
-    // - Expand abbreviations ("bp" -> "blood pressure")
-    // In this demo we just trim.
     return input.trim();
   }
 
@@ -544,25 +531,24 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   Future<void> _runParseThenDiagnosis(String processedUserText) async {
-    if (questionCount > 1){
-      return;
-    }
     _isBusy = true;
     notifyListeners();
     processedUserText = await llmsChangeThaiToEng(processedUserText);
+    print(processedUserText);
     try {
       final parse = await service.parseText(
         text: processedUserText,
         age: age,
         sex: sex,
       );
+      print(parse);
       if (parse.mentions.isEmpty) {
         // Add a bot message telling user we couldn't detect symptoms & ask to rephrase.
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
           sender: ChatSender.bot,
           type: MessageType.text,
-          text: "ฉันไม่พบอาการจากข้อความนั้น คุณช่วยอธิบายเพิ่มเติมได้ไหม?", // Thai
+          text: "ฉันไม่พบอาการจากข้อความนั้น คุณช่วยอธิบายเพิ่มเติมได้ไหม?",
         ));
         notifyListeners();
       } else {
@@ -592,7 +578,7 @@ class InfermedicaChatController extends ChangeNotifier {
       );
       _lastDiagnosis = dx;
 
-      if (dx.isFinished || questionCount >= 10) {
+      if (dx.isFinished) {
         final tx = await service.triage(
           evidence: _evidence, 
           age: age, 
@@ -639,7 +625,7 @@ class InfermedicaChatController extends ChangeNotifier {
           textreuslt: dataselfcare,
         ));
         
-        saveMessagesToFirebase();
+        // saveMessagesToFirebase();
 
       } 
       else {
@@ -807,7 +793,7 @@ class InfermedicaChatController extends ChangeNotifier {
       - ถ้าข้อความแสดงถึงความไม่แน่ใจ ความสงสัย หรือไม่เกี่ยวข้องกับคำถามเลย ให้ตอบด้วย "unknown".
 
       ตัวอย่าง:
-      - คำถาม: "คุณมีไข้ 37-38 องศาใช่หรือไม่?" → ผู้ใช้ตอบ "37.5" ถือว่า present.
+      - คำถาม: "คุณมีไข้ตัวร้อน 37-38 องศาใช่หรือไม่?" → ผู้ใช้ตอบ "37.5" ถือว่า present.
       - คำถามเดียวกัน → ผู้ใช้ตอบ "35" ถือว่า absent.
       - คำถามเดียวกัน → ผู้ใช้ตอบ "dwasdkopj" หรือ "อาการดีอยู่" ถือว่า unknown.
 

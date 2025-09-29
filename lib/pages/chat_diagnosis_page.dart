@@ -59,7 +59,6 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
     _controller!.addSystemMessage(
       'วันเจอเรื่องอะไรมา หรือมีอาการอะไรเล่ามาได้เลยครับ'
     );
-
     setState(() {
       _isDataLoaded = true;
     });
@@ -917,7 +916,7 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
                             const SizedBox(height: 4),
                             Text(
                               "ข้อควรระวัง: ${precautions ?? "-"}",
-                              style: const TextStyle(fontSize: 13, color: Colors.redAccent),
+                              style: const TextStyle(fontSize: 12, color: Colors.redAccent),
                             ),
                           ],
                         ),
