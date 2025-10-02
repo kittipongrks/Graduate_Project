@@ -578,7 +578,7 @@ class InfermedicaChatController extends ChangeNotifier {
       );
       _lastDiagnosis = dx;
 
-      if (dx.isFinished) {
+      if (dx.isFinished || questionCount >= 1) {
         final tx = await service.triage(
           evidence: _evidence, 
           age: age, 

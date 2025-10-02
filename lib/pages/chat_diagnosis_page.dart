@@ -812,7 +812,6 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
   final medicines = (data['medicine_list'] as List?) ?? [];
 
   String _getMedicineImage(String name) {
-    // ตัวอย่าง mapping
     if (name.contains("พารา")) {
       return "assets/images/ยาพารา.png";
     } else if (name.contains("แก้ไอ")) {
@@ -820,10 +819,8 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
     } else if (name.contains("ลดกรด")) {
       return "assets/images/ยาลดกรด.png";
     }
-    // ถ้าไม่ตรง → ใช้ placeholder
     return "assets/images/medicine_placeholder.png";
   }
-
 
   return Card(
     shape: RoundedRectangleBorder(
@@ -854,94 +851,112 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
 
           // Medicines list
           if (medicines.isNotEmpty) ...[
-            const Text(
-              "ยาสามัญประจำบ้านที่แนะนำ:",
-              style: TextStyle(color: Colors.black54, fontSize: 14),
-            ),
             ...medicines.map((m) {
               final name = m["name"] ?? "ชื่อยาไม่ระบุ";
               final usage = m["usage"] ?? "วิธีใช้ไม่ระบุ";
               final precautions = m["precautions"] ?? "ข้อควรระวังไม่ระบุ";
-              return Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                   children: [
-                      // Placeholder for medicine image
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(
-                            _getMedicineImage(name),     // เลือกรูปตามชื่อยา
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              // ถ้าไม่มีไฟล์รูป ให้ใช้ Icon แทน
-                              return const Icon(Icons.medication, size: 36, color: Colors.green);
-                            },
-                          ),
-                        ),
-                      ),
 
-                      const SizedBox(width: 12), 
-
-                      // Medicine info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name ?? "-",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: Colors.black87,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // แถวบน (รูป + ชื่อยา)
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // ครึ่งซ้าย (รูปยา) + คงอัตราส่วน
+                        Expanded(
+                          flex: 1,
+                          child: AspectRatio(
+                            aspectRatio: 1, // 1:1 → กว้าง = สูง
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.green[50],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.asset(
+                                  _getMedicineImage(name),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return const Icon(Icons.medication,
+                                        size: 40, color: Colors.green);
+                                  },
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              "วิธีใช้: ${usage ?? "-"}",
-                              style: const TextStyle(fontSize: 14),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "ข้อควรระวัง: ${precautions ?? "-"}",
-                              style: const TextStyle(fontSize: 12, color: Colors.redAccent),
-                            ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
-                    
-                  ),
+
+                        const SizedBox(width: 12),
+
+                        // ครึ่งขวา (ชื่อยา)
+                        Expanded(
+                          flex: 1,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    // แถวล่าง (usage + precautions)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "วิธีใช้: $usage",
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.red[50],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            "ข้อควรระวัง: $precautions",
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.redAccent,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               );
             }),
           ] else
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
-              child: Text("ไม่มีข้อมูลยาแนะนำ", style: TextStyle(color: Colors.black54)),
+              child: Text("ไม่มีข้อมูลยาแนะนำ",
+                  style: TextStyle(color: Colors.black54)),
             ),
-        const SizedBox(height: 20),
-        const Divider(),
+
+          const Divider(),
           const Text(
             "(นี่คือข้อมูลที่ได้จาก AI)",
             style: TextStyle(fontSize: 12, color: Colors.black54),
           ),
         ],
-        
       ),
     ),
   );
 }
+
+
 

@@ -34,28 +34,28 @@ class _SignUpPageState extends State<SignUpPage> {
 
   Future<void> createUserWithEmailAndPassword() async {
     if (formKey.currentState!.validate()){
-    if(passwordController.text != cfPasswordController.text){
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Passwords do not match')),
-        );
-        return;
-    }else{
-      try {
-        UserCredential? userCredential =
-            await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: emailController.text.trim(),
-          password: passwordController.text.trim(),
-        );
+      if(passwordController.text != cfPasswordController.text){
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Passwords do not match')),
+          );
+          return;
+      }else{
+        try {
+          UserCredential? userCredential =
+              await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
 
-        await createUserDocument(userCredential);
-        print(userCredential.user?.uid);
+          await createUserDocument(userCredential);
+          print(userCredential.user?.uid);
 
-      } on FirebaseAuthException catch (e) {
-        print(e.message);
+        } on FirebaseAuthException catch (e) {
+          print(e.message);
+        }
       }
+      
     }
-    
-  }
   }
 
   // create user document and collent in firestore
@@ -74,8 +74,6 @@ class _SignUpPageState extends State<SignUpPage> {
           });
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -99,10 +97,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 10),
-
-
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
               TextFormField(
                 controller: emailController,
                 decoration: textInputDecoration.copyWith(
@@ -122,8 +117,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   return null;
                 },
               ),
-
-
               const SizedBox(height: 15),
               TextFormField(
                 controller: passwordController,
@@ -142,7 +135,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     }
                   }
               ),
-
               const SizedBox(height: 15),
               TextFormField(
                 controller: cfPasswordController,
@@ -154,8 +146,6 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 obscureText: true,
               ),
-
-
               const SizedBox(height: 15),
               // birthdate field over 15 year old
               TextFormField(
@@ -197,8 +187,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   return null;
                 },
               ),
-
-
               const SizedBox(height: 15),
               //gender male and female selector
               DropdownButtonFormField<String>(
@@ -226,10 +214,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   return null;
                 },
               ),
-                
-
-              
-
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
@@ -242,8 +226,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
-
-
               const SizedBox(height: 20),
               Text.rich(TextSpan(
                 text: 'Already have an account? ',
@@ -261,7 +243,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ],
               )),
-              
             ],
           ),
         ),
