@@ -46,6 +46,8 @@ dependencies:
   provider: ^6.1.5
   firebase_vertexai: ^1.8.3
   google_generative_ai: ^0.4.7
+  geolocator: ^14.0.2
+  url_launcher: ^6.3.2
   
 
 dev_dependencies:

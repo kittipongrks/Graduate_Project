@@ -5,7 +5,10 @@ import 'package:dahcpplication/controller/callinfermedicaapi.dart';
 import 'package:dahcpplication/pages/page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
 class ChatDiagnosisPage extends StatefulWidget {
   const ChatDiagnosisPage({super.key});
 
@@ -21,6 +24,9 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
   String? sex;
   String? foodAllergies;
   String? medicalConditions;
+  String _currentLocation = '';
+  String lat = '';
+  String long = '';
 
   bool _showSuggestionButtons = false;
   bool _isDataLoaded = false;
@@ -674,14 +680,20 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
   final adviceList = (data['advice_list'] as List?) ?? [];
 
   // กรณีฉุกเฉิน
-  if (triageLevel == "emergency") {
-    return Card(
+if (triageLevel == "emergency" || triageLevel == "emergency_24" || triageLevel == "consultation_24") {
+  return InkWell(
+    borderRadius: BorderRadius.circular(20),
+    onTap: () {
+      // เรียกฟังก์ชันหาสถานพยาบาลใกล้ๆ
+      findNearbyHospitals();
+    },
+    child: Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
       ),
       elevation: 4,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16), 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -704,19 +716,18 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
             const SizedBox(height: 20),
             const Divider(height: 24, thickness: 1.2),
             const Text(
-              "กรุณาไปพบแพทย์ฉุกเฉินทันที",
+              "กรุณาไปพบแพทย์ฉุกเฉินทันที\n(กดเพื่อหาสถานพยาบาลใกล้เคียง)",
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: Colors.red,
               ),
             ),
           ],
         ),
       ),
-    );
-  }
-
+    ),
+  );
+}
   // กรณีทั่วไป
   return Card(
     shape: RoundedRectangleBorder(
@@ -809,19 +820,62 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
 }
 
 Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
+  final triageLevel = data['triage_level'];
   final medicines = (data['medicine_list'] as List?) ?? [];
 
-  String _getMedicineImage(String name) {
-    if (name.contains("พารา")) {
-      return "assets/images/ยาพารา.png";
-    } else if (name.contains("แก้ไอ")) {
-      return "assets/images/ยาแก้ไอ.png";
-    } else if (name.contains("ลดกรด")) {
-      return "assets/images/ยาลดกรด.png";
-    }
-    return "assets/images/medicine_placeholder.png";
+  // 🔴 กรณีอาการ sensitive
+  if (triageLevel == "emergency" ||
+      triageLevel == "emergency_24" ||
+      triageLevel == "consultation_24") {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        // TODO: เรียกฟังก์ชันหาสถานพยาบาลใกล้ๆ เช่น goToNearestHospital();
+        findNearbyHospitals();
+      },
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: const [
+                  Text(
+                    "อาการที่มีความอ่อนไหว",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Colors.orange,
+                    ),
+                  ),
+                  Icon(Icons.warning_amber_rounded,
+                      size: 26, color: Colors.orange),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(height: 24, thickness: 1.2),
+              const Text(
+                "อาการของท่านเป็นอาการที่มีความอ่อนไหว\nจึงแนะนำให้ปรึกษาแพทย์ผู้เชี่ยวชาญ\n(กดเพื่อหาสถานพยาบาลใกล้เคียง)",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
+  // 🔵 กรณีทั่วไป (โชว์ข้อมูลยาแนะนำ)
   return Card(
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(20),
@@ -835,16 +889,16 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
           // Header
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
+            children: const [
               Text(
-                data["title_medicine"] ?? "ข้อมูลยาแนะนำ",
-                style: const TextStyle(
+                "ข้อมูลยาแนะนำ",
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
                   color: Colors.green,
                 ),
               ),
-              const Icon(Icons.medical_services, size: 24, color: Colors.green),
+              Icon(Icons.medical_services, size: 24, color: Colors.green),
             ],
           ),
           const Divider(height: 24, thickness: 1.2),
@@ -861,80 +915,26 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // แถวบน (รูป + ชื่อยา)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // ครึ่งซ้าย (รูปยา) + คงอัตราส่วน
-                        Expanded(
-                          flex: 1,
-                          child: AspectRatio(
-                            aspectRatio: 1, // 1:1 → กว้าง = สูง
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.green[50],
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Image.asset(
-                                  _getMedicineImage(name),
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return const Icon(Icons.medication,
-                                        size: 40, color: Colors.green);
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
+                    Text(name,
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(height: 6),
+                    Text("วิธีใช้: $usage", style: const TextStyle(fontSize: 14)),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.red[50],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "ข้อควรระวัง: $precautions",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w500,
                         ),
-
-                        const SizedBox(width: 12),
-
-                        // ครึ่งขวา (ชื่อยา)
-                        Expanded(
-                          flex: 1,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              name,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-
-                    // แถวล่าง (usage + precautions)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "วิธีใช้: $usage",
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                        const SizedBox(height: 6),
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.red[50],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            "ข้อควรระวัง: $precautions",
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.redAccent,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
@@ -958,5 +958,54 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
   );
 }
 
+
+
+Future<void> findNearbyHospitals() async {
+  try {
+    // 1) หา location ปัจจุบัน
+    Position position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+    double lat = position.latitude;
+    double lon = position.longitude;
+
+    // 2) ใช้ Overpass API หาโรงพยาบาลใกล้ ๆ (5 กม. รอบตัวเรา)
+    final overpassUrl =
+        "https://overpass-api.de/api/interpreter?data=[out:json];"
+        "("
+        "node[\"amenity\"=\"hospital\"](around:5000,$lat,$lon);"
+        "way[\"amenity\"=\"hospital\"](around:5000,$lat,$lon);"
+        "relation[\"amenity\"=\"hospital\"](around:5000,$lat,$lon);"
+        ");"
+        "out center;";
+
+    final response = await http.get(Uri.parse(overpassUrl), headers: {
+      "User-Agent": "CREATH+/1.0 (kittipongr65@nu.ac.th)"
+    });
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+
+      if (data["elements"].isEmpty) {
+        throw Exception("ไม่พบโรงพยาบาลใกล้เคียง");
+      }
+
+      // เอาโรงพยาบาลแรก (ใกล้ที่สุดใน list)
+      final hospital = data["elements"][0];
+      final hLat = hospital["lat"] ?? hospital["center"]["lat"];
+      final hLon = hospital["lon"] ?? hospital["center"]["lon"];
+
+      // 3) เปิด Google Maps ไปยังพิกัดโรงพยาบาล
+      final mapsUrl =
+          "https://www.google.com/maps/dir/?api=1&destination=$hLat,$hLon";
+      await launchUrl(Uri.parse(mapsUrl),
+          mode: LaunchMode.externalApplication);
+    } else {
+      throw Exception("API Error: ${response.statusCode}");
+    }
+  } catch (e) {
+    debugPrint("Error: $e");
+  }
+}
 
 
