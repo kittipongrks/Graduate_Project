@@ -48,7 +48,8 @@ dependencies:
   google_generative_ai: ^0.4.7
   geolocator: ^14.0.2
   url_launcher: ^6.3.2
-  
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
 
 dev_dependencies:
   flutter_test:

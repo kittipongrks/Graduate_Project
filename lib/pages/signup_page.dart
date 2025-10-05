@@ -190,7 +190,7 @@ class _SignUpPageState extends State<SignUpPage> {
               const SizedBox(height: 15),
               //gender male and female selector
               DropdownButtonFormField<String>(
-                value: genderController.isNotEmpty ? genderController: null,
+                initialValue: genderController.isNotEmpty ? genderController: null,
                 decoration: textInputDecoration.copyWith(
                   hintText: 'Gender',
                   prefixIcon: Icon(

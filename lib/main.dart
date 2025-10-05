@@ -4,13 +4,15 @@ import 'package:dahcpplication/firebase_options.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dahcpplication/pages/page.dart';
-import 'package:dahcpplication/navigation_menu.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:dahcpplication/theme/theme_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await Hive.openBox('chatBox');
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );

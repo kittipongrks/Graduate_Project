@@ -34,7 +34,7 @@ void _exitAlertDialog(BuildContext context){
 }
 
 class AccountPage extends StatefulWidget{
-  const AccountPage({Key? key}) : super(key: key);
+  const AccountPage({super.key});
 
   @override
   State<AccountPage> createState() => _AccountPageState();
@@ -223,7 +223,7 @@ Future<dynamic> LoadUserInfo() async {
                                 padding: const EdgeInsets.symmetric(horizontal: 12),
                                 child: DropdownButtonFormField<String>(
                                   dropdownColor: Colors.blue.shade100,
-                                value: _genderController.text.isNotEmpty ? _genderController.text : null,
+                                initialValue: _genderController.text.isNotEmpty ? _genderController.text : null,
                                 style: const TextStyle(color: Colors.black),
                                 items: const [
                                   DropdownMenuItem(

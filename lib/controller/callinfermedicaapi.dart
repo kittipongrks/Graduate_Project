@@ -7,6 +7,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:dahcpplication/controller/gemini_generate.dart';
 import 'package:dahcpplication/auth/database.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:hive/hive.dart';
 
 // -----------------------------------------------------------------------------
 // CONFIG
@@ -40,7 +41,7 @@ class ChatMessage {
   final MessageType type ;
   final ChatSender sender;
   final String? text;
-  final Map<String, dynamic>? textreuslt;
+  final Map<String, dynamic>? textresult;
   final Timestamp timestamp;
 
 
@@ -49,7 +50,7 @@ class ChatMessage {
     required this.sender,
     required this.type,
     this.text,
-    this.textreuslt,
+    this.textresult,
     Timestamp? timestamp,
   }) : timestamp = timestamp ?? Timestamp.now();
 
@@ -60,7 +61,7 @@ class ChatMessage {
       'sender': sender.name,
       'type': type.name,
       'text': text,
-      'textreuslt': textreuslt ?? {},
+      'textresult': textresult ?? {},
       'timestamp': timestamp,
     };
   }
@@ -103,14 +104,12 @@ class EvidenceItem {
 class InfermedicaService {
   String? case_id;
 
-  Future<void> new_case_id() async {
+  Future<dynamic> new_case_id() async {
     final uuid = Uuid();
     case_id = uuid.v4();
+    return case_id ;
   }
   
-  void resetPatient(){
-    case_id = null;
-  }
   InfermedicaService({http.Client? client}) : _client = client ?? http.Client();
 
   final http.Client _client;
@@ -130,8 +129,8 @@ class InfermedicaService {
       Uri.parse('$infermedicaBaseUrl/symptoms/$symptomId'),
       headers: _headers(),
     );
-    final symptom_name = jsonDecode(responce.body)['name'];
-    print(symptom_name);
+    final symptomName = jsonDecode(responce.body)['name'];
+    print(symptomName);
   }
 
 
@@ -392,7 +391,7 @@ class InfermedicaChatController extends ChangeNotifier {
 
   Future<void> resetChat() async {
     questionCount = 0;
-    await service.new_case_id(); // Generate a new case_id
+    caseId = await service.new_case_id(); // Generate a new case_id
     _messages.clear();
     _evidence.clear();
     _lastDiagnosis = null;
@@ -422,7 +421,7 @@ class InfermedicaChatController extends ChangeNotifier {
   String foodAllergies;
   String medicalConditions;
   String UserId;
-  final String caseId;
+  String caseId;
 
   Future<void> loadUserData() async {
     final userProfile = await fetchUserInfo();
@@ -438,7 +437,7 @@ class InfermedicaChatController extends ChangeNotifier {
   final List<ChatMessage> _messages = [];
   List<EvidenceItem> _evidence = [];
 
-  Map<String, dynamic> _evidence_common_name = {};
+  final Map<String, dynamic> _evidence_common_name = {};
 
   bool _isBusy = false;
   DiagnosisResult? _lastDiagnosis;
@@ -597,7 +596,7 @@ class InfermedicaChatController extends ChangeNotifier {
           id: const Uuid().v4(),
           sender: ChatSender.bot,
           type: MessageType.cardEvidence,
-          textreuslt : dataEvidence,
+          textresult : dataEvidence,
         ));
 
         // Show final diagnosis summary.
@@ -607,7 +606,7 @@ class InfermedicaChatController extends ChangeNotifier {
           id: const Uuid().v4(),
           sender: ChatSender.bot,
           type: MessageType.cardDiagnosis,
-          textreuslt: dataDiagnosis,
+          textresult: dataDiagnosis,
         ));
 
 
@@ -616,16 +615,16 @@ class InfermedicaChatController extends ChangeNotifier {
           id: const Uuid().v4(), 
           sender: ChatSender.bot,
           type: MessageType.cardSuggest,
-          textreuslt: dataselfcare,
+          textresult: dataselfcare,
         ));
         _messages.add(ChatMessage(
           id: const Uuid().v4(), 
           sender: ChatSender.bot,
           type: MessageType.cardMedicine,
-          textreuslt: dataselfcare,
+          textresult: dataselfcare,
         ));
         
-        // saveMessagesToFirebase();
+        await saveMessagesToHive(_messages);
 
       } 
       else {
@@ -666,12 +665,12 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   Future<List<String>> collect_conditions_name(DiagnosisResult dx)async{
-    List <String> c_thai_List = [];
+    List <String> cThaiList = [];
     for (final i in dx.conditions.take(5)){
-      String c_thai = await Terminology_medical_translate(i.name);
-      c_thai_List.add(c_thai);
+      String cThai = await Terminology_medical_translate(i.name);
+      cThaiList.add(cThai);
     }
-    return c_thai_List ;
+    return cThaiList ;
   }
 
   Future<Map<String, dynamic>> _MaptoCardForcardEvidence(DiagnosisResult dx) async {
@@ -715,13 +714,13 @@ class InfermedicaChatController extends ChangeNotifier {
 
   
   Future<Map<String, dynamic >> _MaptoCardForcardDiagnosis (DiagnosisResult dx) async{
-    List c_thai_List = await collect_conditions_name(dx);
+    List cThaiList = await collect_conditions_name(dx);
     return {
       'title' : "คาดการณ์เบื้องต้น",
       'conditions': dx.conditions.take(5).map((c) => {
         'id': c.id,
         'name': c.name,
-        'name_th': c_thai_List[dx.conditions.indexOf(c)],
+        'name_th': cThaiList[dx.conditions.indexOf(c)],
         'probability': c.probability,
       }).toList(),
       'triage': dx.triage != null ? {
@@ -849,30 +848,35 @@ class InfermedicaChatController extends ChangeNotifier {
   }
   }
 
-  Future<void> saveMessagesToFirebase() async {
-    final resultRef = FirebaseFirestore.instance.collection('messages').doc();
-        print("create new document with ID: ${resultRef.id} success");
 
-        // แปลง _messages เป็น list ของ Map ด้วย toMap()
-        final messageMaps = _messages.map((msg) {
-          return {
-            'id': msg.id,
-            'sender':msg.sender,
-            'type': msg.type.name,
-            'text': msg.text ?? '',
-            'textreuslt': msg.textreuslt ?? {},
-          };
-        }).toList();
-        print("transform _messages to Map success");
+Future<void> saveMessagesToHive(List<ChatMessage> messages) async {
+  final box = await Hive.openBox('chatBox');
+  String chatId = caseId;
+  print(chatId);
 
-        await resultRef.set({
-          'userId': UserId,
-          'createdAt': FieldValue.serverTimestamp(),
-          'result': messageMaps,
-        });
+  // 1. แปลง List<ChatMessage> ใหม่ให้เป็น List<Map<String, dynamic>>
+  final newMessagesToSave = messages.map((msg) => {
+    'id': msg.id,
+    'sender': msg.sender.name,
+    'type': msg.type.name,
+    'text': msg.text ?? '',
+    'textresult': msg.textresult ?? {}, 
+    
+    'timestamp': msg.timestamp.millisecondsSinceEpoch,
+  }).toList();
+  
+  final List<dynamic> existingRawMessages = box.get(chatId) ?? [];
+  
 
-        print('Saved result to Firestore with ID: ${resultRef.id}');
-  }
+  final List<Map<String, dynamic>> existingMessages = 
+      List<Map<String, dynamic>>.from(existingRawMessages.map((e) => e.cast<String, dynamic>()));
+
+  existingMessages.addAll(newMessagesToSave);
+
+  await box.put(chatId, existingMessages);
+  
+  print('✅ Saved chat with id: $chatId. Total messages: ${existingMessages.length}');
+}
 
 }
 

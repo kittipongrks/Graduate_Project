@@ -1,446 +1,127 @@
-import 'package:dahcpplication/pages/history_page.dart';
-import 'package:dahcpplication/theme/theme_provider.dart';
 import 'package:flutter/material.dart';
-import 'package:dahcpplication/auth/database.dart';
-import 'package:dahcpplication/controller/callinfermedicaapi.dart';
-import 'package:dahcpplication/pages/page.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:provider/provider.dart';
+// import 'history_page.dart'; // Commented out as history_page.dart is not provided
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
-class ChatDiagnosisPage extends StatefulWidget {
-  const ChatDiagnosisPage({super.key});
+import 'history_page.dart';
+
+// ⚠️ Placeholder function for demonstration. Replace with actual implementation.
+
+class ChatDetailPage extends StatefulWidget {
+  final String chatId;
+  const ChatDetailPage({super.key, required this.chatId});
 
   @override
-  State<ChatDiagnosisPage> createState() => _ChatDiagnosisState();
+  State<ChatDetailPage> createState() => _ChatDetailPageState();
 }
 
-class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
-  InfermedicaChatController? _controller;
-  final TextEditingController _textCtrl = TextEditingController();
+class _ChatDetailPageState extends State<ChatDetailPage> {
+  List<Map<String, dynamic>> _messages = []; 
+  bool _isLoading = true;
+  String? _error; // Added for displaying loading/error state
   final ScrollController _scrollCtrl = ScrollController();
-  int? age;
-  String? sex;
-  String? foodAllergies;
-  String? medicalConditions;
-  String lat = '';
-  String long = '';
-
-  final bool _showSuggestionButtons = false;
-  bool _isDataLoaded = false;
-  
 
   @override
   void initState() {
     super.initState();
-    loadUserInfo();
+    _loadChatMessages();
   }
 
-  Future<void> loadUserInfo() async {
-    final document = await fetchUserInfo();
-    if (document != null) {
-      age = document['age'];
-      sex = document['sex'];
-      foodAllergies = document['foodAllergies'];
-      medicalConditions = document['medicalConditions'];
-    } else {
-      age = defaultAge;
-      sex = defaultSex;
+  Future<void> _loadChatMessages() async {
+    try {
+      // เนื่องจาก getChatMessages ถูกแก้ให้คืน List<Map<String, dynamic>> แล้ว
+      // ตรงนี้จึงไม่ต้องมีการแปลงซ้ำซ้อน 
+      final data = await getChatMessages(widget.chatId);
+      setState(() {
+        // Cast result to the desired type for state variable
+        _messages = data.cast<Map<String, dynamic>>(); 
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = "เกิดข้อผิดพลาดในการโหลดข้อมูล: $e";
+        _isLoading = false;
+      });
     }
-
-    _controller = InfermedicaChatController(
-      service: InfermedicaService(),
-      age: age,
-      sex: sex,
-      foodAllergies: foodAllergies,
-      medicalConditions: medicalConditions,
-    );
-
-    _controller!.addListener(_onControllerChanged);
-    _controller!.addSystemMessage(
-      'สวัสดี!'
-    );
-    _controller!.addSystemMessage(
-      'วันเจอเรื่องอะไรมา หรือมีอาการอะไรเล่ามาได้เลยครับ'
-    );
-    setState(() {
-      _isDataLoaded = true;
-    });
   }
-
-  @override
-  void dispose() {
-    _controller?.removeListener(_onControllerChanged);
-    _controller?.dispose();
-    _textCtrl.dispose();
-    _scrollCtrl.dispose();
-    super.dispose();
-  }
-
-  void _onControllerChanged() {
-    setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  Future<void> _sendCurrentText() async {
-    final txt = _textCtrl.text;
-    _textCtrl.clear();
-    await _controller?.handleUserInput(txt);
-  }
-  void _DraggableButton(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        title: Row(
-          children: [
-            const Text(
-              'ฟังก์ชันเพิ่มเติม',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const Spacer(),
-            // IconButton(
-            //   onPressed: (){
-            //   themeProvider.toggleTheme();
-            // }, 
-            //   icon: Icon(themeProvider.currentTheme == AppTheme.light 
-            // ? Icons.light_mode
-            // : Icons.dark_mode)),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: GridView.count(
-            shrinkWrap: true,
-            crossAxisCount: 2, // 3 คอลัมน์
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            children: [
-              _buildFunctionButton(Icons.refresh, 'แชทใหม่', () {
-                _controller?.resetChat();
-                Navigator.pop(context);
-              }),
-              _buildFunctionButton(Icons.history, 'ประวัติ', () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context)=> const ChatHistoryPage()),
-                );
-              }),
-              _buildFunctionButton(Icons.person, 'โปรไฟล์', () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const AccountPage()),
-                );
-              }),
-              _buildFunctionButton(Icons.exit_to_app, 'ออกระบบ', (){
-                Navigator.pop(context);
-                _exitAlertDialog(context);
-              }),
-              
-            ],
-          ),
-        ),
-      );
-    },
-  );
-}
-
 
   @override
   Widget build(BuildContext context) {
-    if (!_isDataLoaded || _controller == null) {
+    if (_isLoading) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
     }
 
-    final msgs = _controller!.messages;
+    // Display error message if loading failed
+    if (_error != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('รายละเอียดแชท')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red, fontSize: 16),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            const SizedBox(width: 10),
-            const Text(
-              "Diagnosis",
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const Spacer(),
-            IconButton(
-              icon: const Icon(Icons.grid_view_rounded),
-              onPressed: () {
-                _DraggableButton(context
-                );
-              },
-            ),
-          ],
+        title: const Text(
+          'รายละเอียดแชท',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
       ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(0),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.inversePrimary,
-            ),
-            child: Stack(
-              children: [
-                Column(
-                  children: [
-                    Expanded(
-                      child: ListView.builder(
-                        controller: _scrollCtrl,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: msgs.length,
-                        itemBuilder: (context, i) {
-                          final m = msgs[i];
-                          final isMe = m.sender == ChatSender.user;
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollCtrl,
+                  padding: const EdgeInsets.all(16),
+                  itemCount: _messages.length,
+                  // ใน ListView.builder ใน _ChatDetailPageState
+                  // ...
+                  itemBuilder: (context, index) {
+                    final msg = _messages[index];
+                    
+                    // ให้แน่ใจว่า msg['textresult'] เป็น Map<String, dynamic> ก่อนส่งเข้า function
+                    final Map<String, dynamic> textResult = (msg['textresult'] is Map) 
+                      ? (msg['textresult'] as Map).cast<String, dynamic>() 
+                      : {};
 
-                          Widget content;
-                          switch (m.type) {
-                            case MessageType.text:
-                              content = 
-                              Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Text(
-                                  m.text ?? "",
-                                  style: const TextStyle(fontSize: 16, color: Colors.black87),
-                                ),
-                              );
-                              break;
-
-                            case MessageType.cardEvidence:
-                              content = _buildCardMessageEvidence(m.textresult ?? {});
-                              break;
-                            case MessageType.cardDiagnosis:
-                              content = _buildCardMessageDiagnosis(m.textresult ?? {});
-                              break;
-                            case MessageType.cardSuggest:
-                              content = _buildCardMessageSuggest(m.textresult ?? {});
-                              break;
-                            case MessageType.cardMedicine:  
-                              content = _buildCardMessageMedicine(m.textresult ?? {});
-                              break;
-                          }
-                          final color = switch (m.sender) {
-                            ChatSender.user => [const Color(0xFF50A4E4), const Color(0xFF7F95DB)],
-                            ChatSender.bot => [Colors.grey[200]!, Colors.grey[200]!],
-                            ChatSender.system => [Colors.grey[200]!, Colors.grey[200]!],
-                            ChatSender.error => [Colors.red[400]!, Colors.red[600]!],
-                          };
-
-                          return Align(
-                            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 6),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Container(
-                                    constraints: BoxConstraints(
-                                        maxWidth: MediaQuery.of(context).size.width * 0.8),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: color,
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: const Radius.circular(20),
-                                        topRight: const Radius.circular(20),
-                                        bottomLeft: isMe ? const Radius.circular(20) : const Radius.circular(10),
-                                        bottomRight: isMe ? const Radius.circular(10) : const Radius.circular(20),
-                                      ),
-                                    ),
-                                    child: content,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    if (_controller!.isBusy)
-                      const Padding(
-                        padding: EdgeInsets.all(8.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    _buildQuickAnswerButtons(),
-                    _buildInputBox(context),
-                  ],
+                    switch (msg['type']) {
+                      case 'cardEvidence':
+                        return _buildCardMessageEvidence(textResult);
+                      case 'cardDiagnosis':
+                        return _buildCardMessageDiagnosis(textResult);
+                      case 'cardSuggest':
+                        return _buildCardMessageSuggest(textResult);
+                      case 'cardMedicine':
+                        return _buildCardMessageMedicine(textResult);
+                      default:
+                        return const SizedBox.shrink();
+                    }
+                  },
+                  // ...
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildQuickAnswerButtons() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          _buildTextButton('ใช่', () {
-            _textCtrl.text = "ใช่";
-            _sendCurrentText();
-          }),
-          const SizedBox(width: 8),
-          _buildTextButton('ไม่ใช่', () {
-            _textCtrl.text = "ไม่ใช่";
-            _sendCurrentText();
-          }),
-          const SizedBox(width: 8),
-          _buildTextButton('อาจจะ', () {
-            _textCtrl.text = "อาจจะ";
-            _sendCurrentText();
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInputBox(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.inversePrimary,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.keyboard_arrow_up_rounded, color: Colors.blue),
-            onPressed: () {},
-          ),
-          Expanded(
-            child: TextField(
-              controller: _textCtrl,
-              textInputAction: TextInputAction.send,
-              onSubmitted: (_) => _sendCurrentText(),
-              decoration: InputDecoration(
-                hintText: "พิมพ์ข้อความของคุณ...",
-                filled: true,
-                fillColor: Theme.of(context).colorScheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.all(12),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          ClipOval(
-            child: Container(
-              width: 48,
-              height: 48,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF50A4E4), Color(0xFF7F95DB)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.send, color: Colors.white),
-                onPressed: () {
-                  _sendCurrentText();
-                },
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
 }
-void _exitAlertDialog(BuildContext context){
-  showDialog(context: context, builder: 
-  (BuildContext context){
-    return AlertDialog(
-      title: const Text('ออกจากระบบ' , style: TextStyle(fontSize: 20 , fontWeight: FontWeight.bold)),
-      content: const Text('ต้องการออกจากระบบหรือไม่?'),
-      actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-          child: const Text('ไม่'),
-        ),
-        TextButton(
-          onPressed: () async{
-            await FirebaseAuth.instance.signOut();
-            Navigator.of(context).pop();
-          },
-          child: const Text('ใช่'),
-        ),
-      ],
-    );
-  },
-  );
-}
 
-Widget _buildTextButton(String text, VoidCallback onPressed) {
-  return TextButton(
-    onPressed: onPressed,
-    style: TextButton.styleFrom(
-      foregroundColor: Colors.blue, // สีข้อความ
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      backgroundColor: Colors.blue.withOpacity(0.1), // สีพื้นหลังจางๆ
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: Colors.blue), // เส้นขอบ
-      ),
-    ),
-    child: Text(text),
-  );
-}
-
-Widget _buildFunctionButton(IconData icon, String label, VoidCallback onTap) {
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.blue.shade50,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.blue.shade200),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 32, color: Colors.blue),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500 , color: Color.fromARGB(255, 0, 0, 0)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
- 
 Widget _buildCardMessageEvidence(Map<String, dynamic> data) {
   final evidences = (data['evidences'] as List?)?.cast<Map<String, dynamic>>() ?? [];
 
@@ -545,7 +226,6 @@ Widget _buildCardMessageEvidence(Map<String, dynamic> data) {
     ),
   );
 }
-
 
 Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
   final conditions = (data['conditions'] as List?) ?? [];
@@ -684,54 +364,54 @@ Widget _buildCardMessageSuggest(Map<String, dynamic> data) {
   final adviceList = (data['advice_list'] as List?) ?? [];
 
   // กรณีฉุกเฉิน
-if (triageLevel == "emergency" || triageLevel == "emergency_24" || triageLevel == "consultation_24") {
-  return InkWell(
-    borderRadius: BorderRadius.circular(20),
-    onTap: () {
-      // เรียกฟังก์ชันหาสถานพยาบาลใกล้ๆ
-      findNearbyHospitals();
-    },
-    child: Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      elevation: 4,
-      child: Padding(
-        padding: const EdgeInsets.all(16), 
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  data["title"] ?? "คำแนะนำฉุกเฉิน",
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: Colors.redAccent,
+  if (triageLevel == "emergency" || triageLevel == "emergency_24" || triageLevel == "consultation_24") {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        // เรียกฟังก์ชันหาสถานพยาบาลใกล้ๆ
+        findNearbyHospitals();
+      },
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        elevation: 4,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    data["title"] ?? "คำแนะนำฉุกเฉิน",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Colors.redAccent,
+                    ),
                   ),
-                ),
-                const Icon(Icons.warning_amber_rounded,
-                    size: 26, color: Colors.redAccent),
-              ],
-            ),
-            const SizedBox(height: 20),
-            const Divider(height: 24, thickness: 1.2),
-            const Text(
-              "กรุณาไปพบแพทย์ฉุกเฉินทันที\n(กดเพื่อหาสถานพยาบาลใกล้เคียง)",
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
+                  const Icon(Icons.warning_amber_rounded,
+                      size: 26, color: Colors.redAccent),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              const Divider(height: 24, thickness: 1.2),
+              const Text(
+                "กรุณาไปพบแพทย์ฉุกเฉินทันที\n(กดเพื่อหาสถานพยาบาลใกล้เคียง)",
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
   // กรณีทั่วไป
   return Card(
     shape: RoundedRectangleBorder(
@@ -817,7 +497,6 @@ if (triageLevel == "emergency" || triageLevel == "emergency_24" || triageLevel =
             style: TextStyle(fontSize: 12, color: Colors.black54),
           ),
         ],
-        
       ),
     ),
   );
@@ -1030,8 +709,7 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
   );
 }
 
-
-
+// Fixed findNearbyHospitals function
 Future<void> findNearbyHospitals() async {
   try {
     // 1) หา location ปัจจุบัน
@@ -1040,6 +718,8 @@ Future<void> findNearbyHospitals() async {
     );
     double lat = position.latitude;
     double lon = position.longitude;
+    
+    debugPrint("Current Location: $lat, $lon");
 
     // 2) ใช้ Overpass API หาโรงพยาบาลใกล้ ๆ (5 กม. รอบตัวเรา)
     final overpassUrl =
@@ -1049,35 +729,52 @@ Future<void> findNearbyHospitals() async {
         "way[\"amenity\"=\"hospital\"](around:5000,$lat,$lon);"
         "relation[\"amenity\"=\"hospital\"](around:5000,$lat,$lon);"
         ");"
-        "out center;";
+        "out center;"; // 'out center;' ensures that way and relation elements have a 'center' object for coordinates
 
     final response = await http.get(Uri.parse(overpassUrl), headers: {
       "User-Agent": "CREATH+/1.0 (kittipongr65@nu.ac.th)"
     });
+    
+    debugPrint("Overpass API Status: ${response.statusCode}");
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
+      final elements = data["elements"] as List;
 
-      if (data["elements"].isEmpty) {
-        throw Exception("ไม่พบโรงพยาบาลใกล้เคียง");
+      if (elements.isEmpty) {
+        // Use a simple alert or toast in a real app
+        debugPrint("ไม่พบโรงพยาบาลใกล้เคียง");
+        return; // Exit function gracefully
       }
 
-      // เอาโรงพยาบาลแรก (ใกล้ที่สุดใน list)
-      final hospital = data["elements"][0];
-      final hLat = hospital["lat"] ?? hospital["center"]["lat"];
-      final hLon = hospital["lon"] ?? hospital["center"]["lon"];
+      // เอาโรงพยาบาลแรก (ใกล้ที่สุดใน list ที่ Overpass คืนมา)
+      final hospital = elements[0];
+      
+      // Extract coordinates: 'node' elements have 'lat' and 'lon', 
+      // 'way'/'relation' (with 'out center;') have 'center' object with 'lat' and 'lon'.
+      final hLat = hospital["lat"] ?? hospital["center"]?["lat"];
+      final hLon = hospital["lon"] ?? hospital["center"]?["lon"];
+      
+      if (hLat == null || hLon == null) {
+        debugPrint("ไม่สามารถระบุพิกัดโรงพยาบาลได้");
+        return;
+      }
+      
+      debugPrint("Nearest Hospital Coords: $hLat, $hLon");
 
-      // 3) เปิด Google Maps ไปยังพิกัดโรงพยาบาล
-      final mapsUrl =
-          "https://www.google.com/maps/dir/?api=1&destination=$hLat,$hLon";
-      await launchUrl(Uri.parse(mapsUrl),
-          mode: LaunchMode.externalApplication);
+      // 3) สร้าง URL Google Maps เพื่อนำทางไปยังพิกัดโรงพยาบาล
+      // Using 'dir' for directions from current location to hospital
+      final mapsUrl = "https://www.google.com/maps/dir/?api=1&destination=$hLat,$hLon&travelmode=driving";
+      
+      if (!await launchUrl(Uri.parse(mapsUrl), mode: LaunchMode.externalApplication)) {
+        debugPrint("Could not launch $mapsUrl");
+      }
     } else {
-      throw Exception("API Error: ${response.statusCode}");
+      // Use a simple alert or toast in a real app
+      debugPrint("API Error: ${response.statusCode}");
     }
   } catch (e) {
-    debugPrint("Error: $e");
+    debugPrint("Error in findNearbyHospitals: $e");
+    // In a real app, you'd show a generic error to the user
   }
 }
-
-
