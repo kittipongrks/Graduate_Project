@@ -251,6 +251,7 @@ Future<dynamic> self_care_suggestion(
   "medicine_list": [
     {
       "name": "string",
+      "indication" : "String",
       "usage": "string",
       "precautions": "string"
     }

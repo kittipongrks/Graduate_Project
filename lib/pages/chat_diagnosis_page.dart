@@ -565,7 +565,7 @@ Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
         triageColor = Colors.orange;
         break;
       case "consultation_24":
-        triageText = "แนะนำให้พบแพทย์ภายใน 24 ชั่วโมง";
+        triageText = "แนะนำพบแพทย์ภายใน 24 ชั่วโมง";
         triageColor = Colors.deepOrange;
         break;
       case "emergency":
@@ -660,7 +660,7 @@ Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
                 Text(
                   triageText,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: triageColor,
                   ),
@@ -834,9 +834,35 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
       return "assets/images/ยาแก้ไอ.png";
     } else if (name.contains("ลดกรด")) {
       return "assets/images/ยาลดกรด.png";
+    } else if (name.contains("ท้องเสีย") || name.contains("ผงถ่าน")){
+      return "assets/images/charcoal.jpg";
+    }else if (name.contains("ท้องอืด")){
+      return "assets/images/simethicone.png";
+    }else if (name.contains("น้ำเกลือ")){
+      return "assets/images/water.png";
+    }else if (name.contains("ยาแก้ไอ")){
+      return "assets/images/yafixcough.jpg";
+    }else if (name.contains("ยาดม")){
+      return "assets/images/relief.jpg";
+    }else if (name.contains("ยาระบายแก้ท้องผูก")){
+      return "assets/images/senokot.jpg";
+    }else if (name.contains("ยาหม่อง")){
+      return "assets/images/yamonk.jpg";
+    }else if (name.contains("แอลกอฮอล")){
+      return "assets/images/algohol.png";
+    }else if (name.contains("ไอบูโพรเฟน")){
+      return "assets/images/ibuprofen.png";
+    }else if (name.contains("แก้เจ็บคอ")){
+      return "assets/images/strepsils.jpg";
+    }else if (name.contains("ธาตุน้ำขาว")){
+      return "assets/images/yathadnamkhaw.jpeg";
+    }else if (name.contains("เกลือแร่")){
+      return "assets/images/neolyte.jpg";
     }
     return "assets/images/medicine_placeholder.png";
   }
+
+  
 
   // 🔴 กรณีอาการ sensitive
   if (triageLevel == "emergency" ||
@@ -910,10 +936,10 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 18,
-                  color: Colors.green,
+                  color: Colors.blueAccent
                 ),
               ),
-              const Icon(Icons.medical_services, size: 24, color: Colors.green),
+              const Icon(Icons.medical_services, size: 24, color: Colors.blueAccent),
             ],
           ),
           const Divider(height: 24, thickness: 1.2),
@@ -922,8 +948,10 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
           if (medicines.isNotEmpty) ...[
             ...medicines.map((m) {
               final name = m["name"] ?? "ชื่อยาไม่ระบุ";
+              final indication = m["indication"] ?? "ไม่ระบุ";
               final usage = m["usage"] ?? "วิธีใช้ไม่ระบุ";
               final precautions = m["precautions"] ?? "ข้อควรระวังไม่ระบุ";
+              final image = getMedicineImage(name);
 
               return Padding(
                 padding: const EdgeInsets.only(bottom: 16),
@@ -941,17 +969,17 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
                             aspectRatio: 1, // 1:1 → กว้าง = สูง
                             child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.green[50],
+                                color: Colors.blue[50],
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: Image.asset(
-                                  getMedicineImage(name),
+                                  image,
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
                                     return const Icon(Icons.medication,
-                                        size: 40, color: Colors.green);
+                                        size: 40, color: Colors.blueAccent);
                                   },
                                 ),
                               ),
@@ -971,7 +999,7 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 18,
-                                color: Colors.green,
+                                color: Colors.blueAccent,
                               ),
                             ),
                           ),
@@ -991,6 +1019,11 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
                           style: const TextStyle(fontSize: 14),
                         ),
                         const SizedBox(height: 6),
+                        Text(
+                          "อาการที่รักษา: $indication",
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(height: 10),
                         Container(
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
