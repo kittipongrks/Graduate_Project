@@ -97,7 +97,8 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
     _textCtrl.clear();
     await _controller?.handleUserInput(txt);
   }
-  void _DraggableButton(BuildContext context) {
+  
+void _DraggableButton(BuildContext context) {
   showDialog(
     context: context,
     builder: (BuildContext context) {
@@ -109,20 +110,13 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const Spacer(),
-            // IconButton(
-            //   onPressed: (){
-            //   themeProvider.toggleTheme();
-            // }, 
-            //   icon: Icon(themeProvider.currentTheme == AppTheme.light 
-            // ? Icons.light_mode
-            // : Icons.dark_mode)),
           ],
         ),
         content: SizedBox(
           width: double.maxFinite,
           child: GridView.count(
             shrinkWrap: true,
-            crossAxisCount: 2, // 3 คอลัมน์
+            crossAxisCount: 2,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
             children: [
@@ -130,12 +124,9 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
                 _controller?.resetChat();
                 Navigator.pop(context);
               }),
-              _buildFunctionButton(Icons.history, 'ประวัติ', () {
+              _buildFunctionButton(Icons.local_hospital_outlined, 'ค้นหาโรงพยาบาล', () {
                 Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context)=> const ChatHistoryPage()),
-                );
+                findNearbyHospitals();
               }),
               _buildFunctionButton(Icons.person, 'โปรไฟล์', () {
                 Navigator.pop(context);
@@ -156,7 +147,6 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
     },
   );
 }
-
 
   @override
   Widget build(BuildContext context) {
@@ -1067,14 +1057,34 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
 
 Future<void> findNearbyHospitals() async {
   try {
-    // 1) หา location ปัจจุบัน
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      await Geolocator.openLocationSettings();
+      return;
+    }
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        return;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      return;
+    }
+
     Position position = await Geolocator.getCurrentPosition(
       desiredAccuracy: LocationAccuracy.high,
     );
+
     double lat = position.latitude;
     double lon = position.longitude;
 
-    // 2) ใช้ Overpass API หาโรงพยาบาลใกล้ ๆ (5 กม. รอบตัวเรา)
     final overpassUrl =
         "https://overpass-api.de/api/interpreter?data=[out:json];"
         "("
@@ -1095,12 +1105,10 @@ Future<void> findNearbyHospitals() async {
         throw Exception("ไม่พบโรงพยาบาลใกล้เคียง");
       }
 
-      // เอาโรงพยาบาลแรก (ใกล้ที่สุดใน list)
       final hospital = data["elements"][0];
       final hLat = hospital["lat"] ?? hospital["center"]["lat"];
       final hLon = hospital["lon"] ?? hospital["center"]["lon"];
 
-      // 3) เปิด Google Maps ไปยังพิกัดโรงพยาบาล
       final mapsUrl =
           "https://www.google.com/maps/dir/?api=1&destination=$hLat,$hLon";
       await launchUrl(Uri.parse(mapsUrl),
@@ -1112,5 +1120,6 @@ Future<void> findNearbyHospitals() async {
     debugPrint("Error: $e");
   }
 }
+
 
 

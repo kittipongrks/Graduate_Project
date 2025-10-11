@@ -482,8 +482,6 @@ class InfermedicaChatController extends ChangeNotifier {
     notifyListeners();
 
     callParse(rawUserText);
-    // If we are currently answering a follow‑up question expecting yes/no/maybe,
-    // try to map quick answer directly to evidence for that pending question.
   }
 
   void callParse(String rawUserText) async{
@@ -491,17 +489,13 @@ class InfermedicaChatController extends ChangeNotifier {
       final q = _lastDiagnosis!.question!;
       final EvidenceChoice? mapped = await _mapUserQuickAnswer(rawUserText);
       if (mapped != null && q.items.isNotEmpty) {
-        // apply same choice to all items in the question (simple case).
         for (final item in q.items) {
           _upsertEvidence(item.id, mapped, source: 'suggest');
         }
         await _runDiagnosisCycle();
         return;
       }
-      // else fall through to full parse of free text to capture new symptoms.
     }
-
-    // Otherwise treat as new free‑text symptom description.
     final processed = await _preProcessUserText(rawUserText);
     await _runParseThenDiagnosis(processed);
   }
@@ -576,21 +570,18 @@ class InfermedicaChatController extends ChangeNotifier {
         noGroups: true,
       );
       _lastDiagnosis = dx;
-
-      if (dx.isFinished || questionCount >= 1) {
+      if (dx.isFinished || questionCount >= 10) {
         final tx = await service.triage(
           evidence: _evidence, 
           age: age, 
           sex: sex
         );
-        // ใส่ค่า triage ลงไปใน DiagnosisResult
         final updatedDx = DiagnosisResult(
           question: dx.question,
           conditions: dx.conditions,
           triage: tx,
         );
         _lastDiagnosis = updatedDx;
-
         final dataEvidence = await _MaptoCardForcardEvidence(updatedDx);
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
@@ -598,9 +589,6 @@ class InfermedicaChatController extends ChangeNotifier {
           type: MessageType.cardEvidence,
           textresult : dataEvidence,
         ));
-
-        // Show final diagnosis summary.
-        // final summaryEn = _buildFinalSummaryText(updatedDx);
         final dataDiagnosis = await _MaptoCardForcardDiagnosis(updatedDx);
         _messages.add(ChatMessage(
           id: const Uuid().v4(),
@@ -608,8 +596,6 @@ class InfermedicaChatController extends ChangeNotifier {
           type: MessageType.cardDiagnosis,
           textresult: dataDiagnosis,
         ));
-
-
         final dataselfcare = await _MaptoCardForcardSuggest(updatedDx);
         _messages.add(ChatMessage(
           id: const Uuid().v4(), 
@@ -623,44 +609,29 @@ class InfermedicaChatController extends ChangeNotifier {
           type: MessageType.cardMedicine,
           textresult: dataselfcare,
         ));
-        
-        await saveMessagesToHive(_messages);
-
-      } 
-      else {
-        // Show follow‑up question.
-        final qTextEn = _buildQuestionDisplayText(dx.question!);
-        final qTextTh = await llmsChangeEngToThai(qTextEn);
-        // change to thai
-        _messages.add(ChatMessage(
-          id: const Uuid().v4(),
-          sender: ChatSender.bot,
-          type: MessageType.text,
-          text: qTextTh,
-        ));
-        questionCount++;
+      } else {
+          final qTextEn = _buildQuestionDisplayText(dx.question!);
+          final qTextTh = await llmsChangeEngToThai(qTextEn);
+          _messages.add(ChatMessage(
+            id: const Uuid().v4(),
+            sender: ChatSender.bot,
+            type: MessageType.text,
+            text: qTextTh,
+          ));
+          questionCount++;
       }
       notifyListeners();
     } catch (e) {
       addErrorMessage('เกิดข้อผิดพลาดในการเรียก diagnosis: $e');
-      print('เกิดข้อผิดพลาดในการเรียก diagnosis: $e');
     } finally {
       _isBusy = false;
       notifyListeners();
-      print(_isBusy);
     }
   }
   
   String _buildQuestionDisplayText(DiagnosisQuestion q) {
-    // Example representation for chat.
-    // For group questions, items could be multiple; we show bullet list.
     final buf = StringBuffer();
     buf.writeln(q.text);
-    // if (q.items.isNotEmpty) {
-    //   for (final item in q.items) {
-    //     buf.writeln('- ${item.name}');
-    //   }
-    // }
     return buf.toString().trim();
   }
 
@@ -674,18 +645,15 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> _MaptoCardForcardEvidence(DiagnosisResult dx) async {
-    // ดึงข้อมูล concepts จาก service
     final concepts = await service.getConceptsByIds(
       _evidence.map((e) => e.id).toList(),
     );
 
-    // สร้าง Map <id, common_name>
     final Map<String, String> commonNameMap = {
       for (final concept in concepts)
         concept['id']: concept['common_name'] ?? concept['name'],
     };
 
-    // อัปเดต EvidenceItem แต่ละตัวให้มี common_name
     _evidence = _evidence.map((e) {
       return EvidenceItem(
         id: e.id,
@@ -709,7 +677,6 @@ class InfermedicaChatController extends ChangeNotifier {
         'choice': EvidenceItem._choiceToString(e.choice),
       }).toList(),
     };
-
   }
 
   
@@ -731,7 +698,6 @@ class InfermedicaChatController extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> _MaptoCardForcardSuggest(DiagnosisResult dx) async {
-    // แปลง _evidence เป็น Map ที่ self_care_suggestion ต้องการ
     final List evidences = _evidence.map((e) => {
       'id': e.id,
       'common_name': e.common_name ?? e.id,
@@ -743,7 +709,6 @@ class InfermedicaChatController extends ChangeNotifier {
       'evidences': evidences,
     };
 
-    // เรียก self_care_suggestion พร้อมส่ง preparedData
     final result = await self_care_suggestion(
       dx,
       age,
@@ -754,14 +719,12 @@ class InfermedicaChatController extends ChangeNotifier {
     );
 
     try {
-      // 🔹 ตัด ```json และ ``` ออก (ถ้า needed)
       String cleaned = result
           .toString()
           .replaceAll("```json", "")
           .replaceAll("```", "")
           .trim();
       final Map<String, dynamic> parsed = jsonDecode(cleaned);
-
       return {
         'title_suggest': "คำแนะนำ",
         'triage_level': parsed['triage_level'] ?? "-",
@@ -770,7 +733,6 @@ class InfermedicaChatController extends ChangeNotifier {
         'medicine_list': parsed['medicine_list'] ?? [],
       };
     } catch (e) {
-      print("JSON parse error: $e");
       return {
         'title_suggest': "คำแนะนำ",
         'triage_level': "-",
@@ -783,26 +745,46 @@ class InfermedicaChatController extends ChangeNotifier {
 
 
   Future<EvidenceChoice?> _mapUserQuickAnswer(String text) async{
-    final lastChatMessage = _messages.last;
+    final lastChatMessage = _messages[_messages.length - 2];
     final lastQuestionText = lastChatMessage.text; 
+    print(lastQuestionText);
 
-    final prompt = """ จัดประเภทข้อความที่ผู้ใช้ป้อนว่าเป็นหนึ่งในคำสำคัญสำหรับ Infermedica EvidenceChoice ตามความหมาย:
-      - ถ้าข้อความแสดงถึงความหมายเชิงบวกหรือการยืนยัน และเหมาะสมกับกรอบคำถาม ให้ตอบด้วย "present".
-      - ถ้าข้อความแสดงถึงความหมายเชิงลบ การปฏิเสธ หรือไม่เหมาะสมกับกรอบคำถาม ให้ตอบด้วย "absent".
-      - ถ้าข้อความแสดงถึงความไม่แน่ใจ ความสงสัย หรือไม่เกี่ยวข้องกับคำถามเลย ให้ตอบด้วย "unknown".
+    if(text.trim() == "ใช่"){
+      return EvidenceChoice.present;
+    } else if (text.trim() == "ไม่ใช่"){
+      return EvidenceChoice.absent;
+    } else if(text.trim() == "อาจจะ"){
+      return EvidenceChoice.unknown;
+    }
 
-      ตัวอย่าง:
-      - คำถาม: "คุณมีไข้ตัวร้อน 37-38 องศาใช่หรือไม่?" → ผู้ใช้ตอบ "37.5" ถือว่า present.
-      - คำถามเดียวกัน → ผู้ใช้ตอบ "35" ถือว่า absent.
-      - คำถามเดียวกัน → ผู้ใช้ตอบ "dwasdkopj" หรือ "อาการดีอยู่" ถือว่า unknown.
+    final prompt = """จัดประเภทข้อความที่ผู้ใช้ป้อนว่าเป็นหนึ่งในคำสำคัญสำหรับ Infermedica EvidenceChoice ตามความหมาย:
 
-      แสดงผลลัพธ์เป็นเพียงคำสำคัญเท่านั้น: present, absent, หรือ unknown.
-      คำถามล่าสุดที่ถามผู้ใช้: $lastQuestionText
-      ข้อความที่ผู้ใช้ป้อน: $text """;
+    * **present:** ข้อความแสดงถึงความหมายเชิงบวกหรือการยืนยัน และเหมาะสมกับกรอบคำถาม เช่น ใช่ ถูก ถูกเลย ถูกนะ หรือให้ข้อมูลที่บ่งชี้ว่าอาการนั้นมีอยู่จริง (เช่น ถามว่า "มีไข้ไหม" ตอบว่า "ตัวร้อน")
+    * **absent:** ข้อความแสดงถึงความหมายเชิงลบ การปฏิเสธ หรือให้ข้อมูลที่บ่งชี้ว่าอาการนั้นไม่มีอยู่จริง (เช่น ไม่ใช่ ไม่ถูก ไม่ใช่นะ ไม่ใช่เลย หรือให้ข้อมูลที่ขัดแย้งกับคำถาม เช่น ถามว่า "มีไข้ไหม" ตอบว่า "หนาวสั่น")
+    * **unknown:** ข้อความแสดงถึงความไม่แน่ใจ ความสงสัย ไม่แน่ใจ (เช่น "อาจจะ" "ไม่แน่ใจ" "จำไม่ได้") หรือไม่เกี่ยวข้องกับคำถามเลย (เช่น ตอบคำถามอื่น หรือพูดถึงเรื่องอื่นที่ไม่เกี่ยวข้อง) หรือข้อมูลไม่เพียงพอต่อการระบุว่ามีหรือไม่มีอาการนั้น
 
+    **เกณฑ์เพิ่มเติม:**
 
+    *   **ความเหมาะสมกับกรอบคำถาม:** ข้อความจะต้องตอบคำถามโดยตรง หรือให้ข้อมูลที่สามารถนำมาตีความได้ว่าสอดคล้องกับคำถามนั้น
+    *   **คำตอบกำกวม:** หากผู้ใช้ให้คำตอบที่ไม่ชัดเจนหรือกำกวม (เช่น "อาจจะ" "ไม่แน่ใจ") ให้ถือว่าเป็น `unknown`
+
+    **กรณีคำถามเชิงช่วงเวลา:**
+
+    *   คำถาม: "คุณมีไข้ตัวร้อน 37-38 องศาใช่หรือไม่?" → ผู้ใช้ตอบ "37.5" ถือว่า `present`.
+    *   คำถามเดียวกัน → ผู้ใช้ตอบ "35" ถือว่า `absent`.
+    *   คำถามเดียวกัน → ผู้ใช้ตอบ "เหงานี่แหละเหงา" หรือ "อาการดีอยู่" ที่ไม่ได้เกี่ยวข้องกับคำถาม ถือว่า `unknown`.
+    *   คำถาม: “ปวดคอมาอย่างน้อย 7 วันแต่ไม่เกิน 3 เดือน ” → ผู้ใช้ตอบ “ปวดคอมา 8 วัน” หรือ “เป็นมา 9 วันแล้ว” ถือว่า `present` (เนื่องจากอยู่ในช่วง 7 วันถึง 3 เดือน)
+    *   คำถามเดียวกัน → ผู้ใช้ตอบ “6 วัน” หรือ“มากกว่า 3 เดือน” ถือว่า `absent`
+    *   คำถามเดียวกัน → ผู้ใช้ตอบที่ไม่ได้เกี่ยวข้องกับคำถาม ถือว่า `unknown`
+
+    **Output:** `present`, `absent`, หรือ `unknown` เท่านั้น
+
+    **คำถามล่าสุดที่ถามผู้ใช้:** $lastQuestionText
+    **ข้อความที่ผู้ใช้ป้อน:** $text
+      """;
 
       final body = jsonEncode({
+        "model": "gemini-2.0-pro",
         "contents": [
           {
             "parts": [
@@ -810,73 +792,86 @@ class InfermedicaChatController extends ChangeNotifier {
             ]
           }
         ],
+        "generationConfig":{
+          "maxOutputTokens": 10,
+          "temperature": 0.1,
+          "topP": 0.8,
+          "topK": 10,
+        }
       });
-      final response = await http.post(
-        Uri.parse(endpoint),
-        headers: headers,
-        body: body,
-      );
+      
+      try {
+        final response = await http.post(
+          Uri.parse(endpoint),
+          headers: headers,
+          body: body,
+        );
 
-  final data = jsonDecode(response.body);
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (data['candidates'] != null && data['candidates'].isNotEmpty) {
+            final resultText = data['candidates'][0]['content']['parts'][0]['text']
+                .trim()
+                .toLowerCase()
+                .replaceAll('`', ''); // ลบ ` ออกจากผลลัพธ์
 
-  if (response.statusCode == 200 && data['candidates'] != null) {
-    try {
-      final text = data['candidates'][0]['content']['parts'][0]['text']
-          .trim()
-          .toLowerCase();
+            print('Gemini Response: "$resultText"');
 
-      switch (text) {
-        case 'present':
-          return EvidenceChoice.present;
-        case 'absent':
-          return EvidenceChoice.absent;
-        case 'unknown':
-          return EvidenceChoice.unknown;
-        default:
-          return null; // unexpected output
+            // 4. ทำให้การตรวจสอบผลลัพธ์ยืดหยุ่นขึ้น
+            if (resultText.contains('present')) {
+              return EvidenceChoice.present;
+            } else if (resultText.contains('absent')) {
+              return EvidenceChoice.absent;
+            } else if (resultText.contains('unknown')) {
+              return EvidenceChoice.unknown;
+            } else {
+              print('Warning: Could not classify the response.');
+              return null; // หรือจะให้เป็น unknown ก็ได้
+            }
+          } else {
+            print('Error: No candidates found\n${response.body}');
+            return null;
+          }
+        } else {
+          print('Error with status code ${response.statusCode}: ${response.body}');
+          return null;
+        }
+      } catch (e) {
+        print('Error during API call: $e');
+        return null;
       }
-    } catch (e) {
-      print('Error parsing response: $e\n${response.body}');
-      return null;
-    }
-  } else if (data['error'] != null) {
-    print('Error: ${data['error']['message']}');
-    return null;
-  } else {
-    print('Error: No candidates found\n${response.body}');
-    return null;
-  }
+
   }
 
 
-Future<void> saveMessagesToHive(List<ChatMessage> messages) async {
-  final box = await Hive.openBox('chatBox');
-  String chatId = caseId;
-  print(chatId);
+// Future<void> saveMessagesToHive(List<ChatMessage> messages) async {
+//   final box = await Hive.openBox('chatBox');
+//   String chatId = caseId;
+//   print(chatId);
 
-  // 1. แปลง List<ChatMessage> ใหม่ให้เป็น List<Map<String, dynamic>>
-  final newMessagesToSave = messages.map((msg) => {
-    'id': msg.id,
-    'sender': msg.sender.name,
-    'type': msg.type.name,
-    'text': msg.text ?? '',
-    'textresult': msg.textresult ?? {}, 
+//   // 1. แปลง List<ChatMessage> ใหม่ให้เป็น List<Map<String, dynamic>>
+//   final newMessagesToSave = messages.map((msg) => {
+//     'id': msg.id,
+//     'sender': msg.sender.name,
+//     'type': msg.type.name,
+//     'text': msg.text ?? '',
+//     'textresult': msg.textresult ?? {}, 
     
-    'timestamp': msg.timestamp.millisecondsSinceEpoch,
-  }).toList();
+//     'timestamp': msg.timestamp.millisecondsSinceEpoch,
+//   }).toList();
   
-  final List<dynamic> existingRawMessages = box.get(chatId) ?? [];
+//   final List<dynamic> existingRawMessages = box.get(chatId) ?? [];
   
 
-  final List<Map<String, dynamic>> existingMessages = 
-      List<Map<String, dynamic>>.from(existingRawMessages.map((e) => e.cast<String, dynamic>()));
+//   final List<Map<String, dynamic>> existingMessages = 
+//       List<Map<String, dynamic>>.from(existingRawMessages.map((e) => e.cast<String, dynamic>()));
 
-  existingMessages.addAll(newMessagesToSave);
+//   existingMessages.addAll(newMessagesToSave);
 
-  await box.put(chatId, existingMessages);
+//   await box.put(chatId, existingMessages);
   
-  print('✅ Saved chat with id: $chatId. Total messages: ${existingMessages.length}');
-}
+//   print('✅ Saved chat with id: $chatId. Total messages: ${existingMessages.length}');
+// }
 
 }
 
