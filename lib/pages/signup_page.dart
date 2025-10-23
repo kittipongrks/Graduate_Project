@@ -34,45 +34,46 @@ class _SignUpPageState extends State<SignUpPage> {
 
   Future<void> createUserWithEmailAndPassword() async {
     if (formKey.currentState!.validate()){
-    if(passwordController.text != cfPasswordController.text){
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Passwords do not match')),
-        );
-        return;
-    }else{
-      try {
-        UserCredential? userCredential =
-            await FirebaseAuth.instance.createUserWithEmailAndPassword(
-          email: emailController.text.trim(),
-          password: passwordController.text.trim(),
-        );
+      if(passwordController.text != cfPasswordController.text){
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Passwords do not match')),
+          );
+          return;
+      }else{
+        try {
+          UserCredential? userCredential =
+              await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
 
-        await createUserDocument(userCredential);
-        print(userCredential.user?.uid);
+          await createUserDocument(userCredential);
+          print(userCredential.user?.uid);
 
-      } on FirebaseAuthException catch (e) {
-        print(e.message);
+        } on FirebaseAuthException catch (e) {
+          print(e.message);
+        }
       }
+      
     }
-    
-  }
   }
 
   // create user document and collent in firestore
   Future<void> createUserDocument(UserCredential? userCredential) async{
     if (userCredential != null && userCredential.user != null){
+      final uid = userCredential.user!.uid;
       await FirebaseFirestore.instance
           .collection('Users')
-          .doc(userCredential.user!.email)
+          .doc(uid)
           .set({
             'email': userCredential.user!.email,
             'birthdate': birthdate != null ? Timestamp.fromDate(birthdate!) : null,
             'gender' : genderController,
+            'foodAllergies': '',
+            'medicalConditions': '',
           });
     }
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -96,10 +97,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 10),
-
-
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
               TextFormField(
                 controller: emailController,
                 decoration: textInputDecoration.copyWith(
@@ -119,8 +117,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   return null;
                 },
               ),
-
-
               const SizedBox(height: 15),
               TextFormField(
                 controller: passwordController,
@@ -139,7 +135,6 @@ class _SignUpPageState extends State<SignUpPage> {
                     }
                   }
               ),
-
               const SizedBox(height: 15),
               TextFormField(
                 controller: cfPasswordController,
@@ -151,8 +146,6 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 obscureText: true,
               ),
-
-
               const SizedBox(height: 15),
               // birthdate field over 15 year old
               TextFormField(
@@ -169,7 +162,7 @@ class _SignUpPageState extends State<SignUpPage> {
                   DateTime? pickedDate = await showDatePicker(
                     context: context,
                     initialDate: DateTime.now(),
-                    firstDate: DateTime.now().subtract(const Duration(days: 365 * 15)),
+                    firstDate: DateTime.now().subtract(const Duration(days: 365 * 100)),
                     lastDate: DateTime.now(),
                     builder: (context, child) {
                       return Theme(
@@ -194,12 +187,10 @@ class _SignUpPageState extends State<SignUpPage> {
                   return null;
                 },
               ),
-
-
               const SizedBox(height: 15),
               //gender male and female selector
               DropdownButtonFormField<String>(
-                value: genderController.isNotEmpty ? genderController: null,
+                initialValue: genderController.isNotEmpty ? genderController: null,
                 decoration: textInputDecoration.copyWith(
                   hintText: 'Gender',
                   prefixIcon: Icon(
@@ -208,8 +199,8 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 items: const [
-                  DropdownMenuItem(value: 'Male', child: Text('Male')),
-                  DropdownMenuItem(value: 'Female', child: Text('Female')),
+                  DropdownMenuItem(value: 'male', child: Text('Male')),
+                  DropdownMenuItem(value: 'female', child: Text('Female')),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -223,10 +214,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   return null;
                 },
               ),
-                
-
-              
-
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () async {
@@ -239,8 +226,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
               ),
-
-
               const SizedBox(height: 20),
               Text.rich(TextSpan(
                 text: 'Already have an account? ',
@@ -258,7 +243,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ],
               )),
-              
             ],
           ),
         ),

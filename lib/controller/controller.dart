@@ -1,3 +1,3 @@
 export './widget.dart';
-export './addUserDetail.dart';
-export './share_preferences.dart';
+export './gemini_generate.dart';
+export './callinfermedicaapi.dart';
