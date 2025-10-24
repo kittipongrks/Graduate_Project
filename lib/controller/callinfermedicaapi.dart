@@ -6,8 +6,6 @@ import 'package:uuid/uuid.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:dahcpplication/controller/gemini_generate.dart';
 import 'package:dahcpplication/auth/database.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:hive/hive.dart';
 
 // -----------------------------------------------------------------------------
 // CONFIG
@@ -397,6 +395,7 @@ class InfermedicaChatController extends ChangeNotifier {
     _lastDiagnosis = null;
     addSystemMessage('สวัสดี!');
     addSystemMessage('มีอาการอะไรเล่ามาได้เลยครับ');
+    addSystemMessage('มีอาการไข้ ไอ เจ็บคอ ปวดหัว ปวดเมื่อยตัว ไหมครับ?');
     notifyListeners();
   }
   InfermedicaChatController({
@@ -436,8 +435,6 @@ class InfermedicaChatController extends ChangeNotifier {
 
   final List<ChatMessage> _messages = [];
   List<EvidenceItem> _evidence = [];
-
-  final Map<String, dynamic> _evidence_common_name = {};
 
   bool _isBusy = false;
   DiagnosisResult? _lastDiagnosis;

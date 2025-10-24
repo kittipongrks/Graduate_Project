@@ -1,11 +1,8 @@
-import 'package:dahcpplication/pages/history_page.dart';
-import 'package:dahcpplication/theme/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:dahcpplication/auth/database.dart';
 import 'package:dahcpplication/controller/callinfermedicaapi.dart';
 import 'package:dahcpplication/pages/page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -28,7 +25,6 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
   String lat = '';
   String long = '';
 
-  final bool _showSuggestionButtons = false;
   bool _isDataLoaded = false;
   
 
@@ -63,7 +59,7 @@ class _ChatDiagnosisState extends State<ChatDiagnosisPage> {
       'สวัสดี!'
     );
     _controller!.addSystemMessage(
-      'วันเจอเรื่องอะไรมา หรือมีอาการอะไรเล่ามาได้เลยครับ'
+      'วันเจอเรื่องอะไรมา หรือมีอาการอาการไข้ ไอ เจ็บคอ ปวดหัว ปวดเมื่อยตัวเล่ามาได้เลยครับ'
     );
     setState(() {
       _isDataLoaded = true;

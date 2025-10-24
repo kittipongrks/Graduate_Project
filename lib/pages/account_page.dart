@@ -1,10 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:dahcpplication/auth/database.dart';
-import 'package:intl/intl.dart';
-import 'package:flutter/gestures.dart';
-import 'package:dahcpplication/controller/controller.dart';
 
 
 void _exitAlertDialog(BuildContext context){

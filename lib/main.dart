@@ -39,17 +39,6 @@ class MyApp extends StatelessWidget {
 
           theme: lightThemeData(context),
           darkTheme: darkThemeData(context),
-          themeMode: () {
-            switch (themeProvider.currentTheme) {
-              case AppTheme.light:
-                return ThemeMode.light;
-              case AppTheme.dark:
-                return ThemeMode.dark;
-              case AppTheme.system:
-              default:
-                return ThemeMode.system;
-            }
-          }(),
 
           home: StreamBuilder(
             stream: FirebaseAuth.instance.authStateChanges(),
