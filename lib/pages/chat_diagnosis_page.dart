@@ -551,7 +551,7 @@ Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
         triageColor = Colors.orange;
         break;
       case "consultation_24":
-        triageText = "แนะนำพบแพทย์ภายใน 24 ชั่วโมง";
+        triageText = "แนะนำพบแพทย์ใน 24 ชม";
         triageColor = Colors.deepOrange;
         break;
       case "emergency":
@@ -559,7 +559,7 @@ Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
         triageColor = Colors.red;
         break;
       case "emergency_24":
-        triageText = "พบแพทย์ฉุกเฉินภายใน 24 ชั่วโมง";
+        triageText = "พบแพทย์ด่วนใน 24 ชม.";
         triageColor = Colors.redAccent;
         break;
     }
@@ -646,7 +646,7 @@ Widget _buildCardMessageDiagnosis(Map<String, dynamic> data) {
                 Text(
                   triageText,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 10,
                     fontWeight: FontWeight.bold,
                     color: triageColor,
                   ),
@@ -842,8 +842,10 @@ Widget _buildCardMessageMedicine(Map<String, dynamic> data) {
       return "assets/images/strepsils.jpg";
     }else if (name.contains("ธาตุน้ำขาว")){
       return "assets/images/yathadnamkhaw.jpeg";
-    }else if (name.contains("เกลือแร่")){
+    }else if (name.contains("ORT")){
       return "assets/images/neolyte.jpg";
+    }else if (name.contains("ORS")){
+      return "assets/images/ors.jpeg";
     }
     return "assets/images/medicine_placeholder.png";
   }
